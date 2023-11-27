@@ -1,0 +1,72 @@
+#! /bin/bash
+
+START_TIME=$SECONDS
+options=$@
+arguments=($options)
+
+#default options
+readsize=150
+outdir='StrainR2DB'
+excludesize=10000
+
+#parse options
+i=0
+for argument in $options
+  do
+    i=$(( $i + 1 ))
+
+    case $argument in
+      -i | --indir) indir="${arguments[i]}" ;;
+      -o | --outdir) outdir="${arguments[i]}" ;;
+      -r | --readsize) readsize="${arguments[i]}" ;;
+      -s | --subcontigsize) subcontigsize="${arguments[i]}" ;;
+      -e | --excludesize) excludesize="${arguments[i]}" ;;
+      -h | --help) 
+            printf "USAGE: PreProcessR -i path/to/in [OPTIONS]\n\
+PreProcessR counts the unique hashes in subcontigs for StrainR to normalize reads with.\n\
+\tRequired Arguments:\n\
+\t\t-i/--indir path/to/genomes\t: path to the directory for all community genomes\n\
+\tOptional Arguments:\n\
+\t\t-o/--outdir path/to/out\t\t: path to your output directory [Default = StrainR2DB]\n\
+\t\t-e/--excludesize number\t\t: exclude subcontig size (minimum subcontig size) [Default = 10000]\n\
+\t\t-s/--subcontigsize number\t: maximum subcontig size (overrides default use of calculated N50)[Default = N50]\n\
+\t\t-r/--readsize number\t\t: Size of one end of a read. E.g.: for 150bp paired end reads readsize is 150. All reads must be paired. [Default = 150]\n\
+\t\t-h/--help\t\t\t: Display this message\n"
+            exit
+            ;;
+    esac
+  done
+
+if [ -z "$indir" ]; then
+  echo "Error: Input directory needs to be specified with -i or --indir. Use 'PreprocessR --help' for more info."
+  exit
+fi
+  
+
+#preprocessr pipeline
+echo "Creating subcontigs"
+mkdir "$outdir"
+ksize=$(("$readsize" * 2 + 1))
+
+if ! [ -z "$subcontigsize" ]; then
+  subcontigsize="-f $subcontigsize"
+fi
+
+
+if subcontig -i "$indir" -o "$outdir" -e "$excludesize" "$subcontigsize"; then
+  
+  echo "Subcontigs generated"
+  hashcounter.py "$outdir" "$ksize"
+  echo "Generating BBIndex"
+  mkdir "$outdir"/BBindex
+  cat "$outdir"/Subcontigs/*.subcontig "$outdir"/excludedSubcontigs/*.subcontig > "$outdir"/BBindex/BBIndex.fasta
+  bbmap.sh ref="$outdir"/BBindex/BBIndex.fasta path="$outdir"/BBindex
+  
+  else
+  echo "Subcontig generation failed"
+  exit
+fi
+
+echo "PreProcessR complete"
+echo "Total Run Time: $((($SECONDS - $START_TIME)/60)) min $((($SECONDS - $START_TIME)%60)) sec"  
+exit

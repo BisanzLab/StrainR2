@@ -1,0 +1,13 @@
+#Summary
+#Generated on	Sat Nov 25 08:34:13 EST 2023
+#Version	5
+chroms	1
+bases	174032040
+defined	172280416
+undefined	1751624
+contigs	4612
+scaffolds	2792
+interpad	300
+source	/home/kheber/StrainR/example_data/StrainR2DB/BBindex/BBIndex.fasta
+bytes	175753235
+last modified	1700919252192
