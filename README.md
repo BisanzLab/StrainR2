@@ -174,13 +174,14 @@ The following example of running StrainR2 on mock reads of the sFMT community se
 ```
 PreProcessR -i StrainR2/example_data/sFMT/ -o <output/directory/of/your/choosing>
 ```
-This will generate a StrainR2 database with default options (N50 subcontig size, 10kbp exclude size, 150bp reads), and put it in the output directory specified by the `-o` option. The example output (in `example_data/StrainR2DB`) should be identical to the output produced when running the above command.
+This will generate a StrainR2 database with default options (N50 subcontig size, 10kbp exclude size, 150bp reads), and put it in the output directory specified by the `-o` option.
 
-`StrainR` can subsequently be run on the output of `PreProcessR`. An example using mock reads where each strain has equal coverage is given below, where the data used for runs as well as the corresponding output can again be found in `example_data`. Note that `StrainR2/example_data/StrainR2DB` could also be replaced by your own `PreProcessR` output from the previous step.
+`StrainR` can be run multiple times on the output of `PreProcessR`. An example using mock reads where each strain has equal coverage is given below. The data used for runs as well as the corresponding output can be found in `example_data`.
+
 ```
-StrainR -1 StrainR2/example_data/mock_reads/shallow_uniform_R1.fastq.gz -2 StrainR2/example_data/mock_reads/shallow_uniform_R2.fastq.gz -r StrainR2/example_data/StrainR2DB -p shallow_uniform -o <output/directory/of/your/choosing>
+StrainR -1 StrainR2/example_data/mock_reads/shallow_uniform_R1.fastq.gz -2 StrainR2/example_data/mock_reads/shallow_uniform_R2.fastq.gz -r <your/preprocessr/output/directory> -p shallow_uniform -o <output/directory/of/your/choosing>
 ```
-Abundance data will be put in the directory specified after `-o`. This includes a plot of abundances, which in the case of the provided mock reads will be very close to uniform. We recommend using median_FUKM as the measure of abundance for strains.
+Abundance data will be put in the directory specified after `-o`. This includes a plot of abundances, which in the case of the provided mock reads will be very close to uniform. Due to the provided reads having low coverage to keep file sizes small, subcontig FUKMs will have a larger spread than usual. We recommend using median_FUKM as the measure of abundance for strains.
 
 <p>&nbsp;</p>
 
