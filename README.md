@@ -9,16 +9,17 @@ StrainR2 is a solution that quantifies strain abundances to within a couple of p
 
 # Installation
 
-StrainR2 is made for linux based operating systems (including mac). Dependencies are listed at the bottom of this README, but using a package manager such as conda or docker is highly recommended for reproducibility.
+StrainR2 is made for linux based operating systems. Dependencies are listed at the bottom of this README, but using conda is highly recommended for reproducibility.
 
 ### Option A: Bioconda (recommended)
 Conda can be installed from the command line and is highly recommended for managing package dependencies.
-TO BE ADDED
 
-### Option B: Docker
-TO BE ADDED
+```
+conda create -n strainr2 -c bioconda -c conda-forge strainr2
+conda activate strainr2
+```
 
-### Option C: Installation from source
+### Option B: Installation from source
 To install the source code into a directory onto your computer, clone the source git repository:
 ```
 git clone https://github.com/BisanzLab/StrainR2.git
