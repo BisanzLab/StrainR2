@@ -19,7 +19,14 @@ conda create -n strainr2 -c bioconda -c conda-forge strainr2
 conda activate strainr2
 ```
 
-### Option B: Installation from source
+### Option B: Docker
+Docker is another package manager that can be used to ensure StrainR2 can be run in a replicable manner. 
+```
+docker pull quay.io/biocontainers/strainr2:<tag>
+```
+Where \<tag\> needs to be replaced by any valid tag ([see valid StrainR2 tags](https://quay.io/repository/biocontainers/strainr2?tab=tags)).
+
+### Option C: Installation from source
 To install the source code into a directory onto your computer, clone the source git repository:
 ```
 git clone https://github.com/BisanzLab/StrainR2.git
