@@ -20,7 +20,7 @@
     "\t\t-h\t\t: display this message again\n"
 
 // for testing purposes this code was compiled with:
-// gcc -g -fsanitize=address -o subcontig subcontig.c
+// gcc -g -fsanitize=address -std=gnu99 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter -O0 -o subcontig subcontig.c
 
 // the provided binary was compiled using:
 // gcc -o subcontig subcontig.c
@@ -85,24 +85,24 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    // parse directories for extraneous `/`s
+    // make output locations
     char *excludeDir;
-    if (outdir[strlen(outdir) - 1] != '/') {
-        excludeDir = calloc((strlen(outdir) + 21), sizeof(char));
-        sprintf(excludeDir, "%s/excludedSubcontigs/", outdir);
-        outdir = realloc(outdir, (strlen(outdir) + 17) * sizeof(char));
-        sprintf(outdir, "%s/Subcontigs/", outdir);
-    } else {
-        excludeDir = calloc((strlen(outdir) + 20), sizeof(char));
-        sprintf(excludeDir, "%sexcludedSubcontigs/", outdir);
-        outdir = realloc(outdir, (strlen(outdir) + 16) * sizeof(char));
-        sprintf(outdir, "%sSubcontigs/", outdir);
-    }
+    char *temp;
+    excludeDir = calloc((strlen(outdir) + strlen("/excludedSubcontigs/") + 1), sizeof(char));
+    sprintf(excludeDir, "%s/excludedSubcontigs/", outdir);
 
-    if (indir[strlen(indir) - 1] != '/') {
-        indir = realloc(indir, (strlen(indir) + 2) * sizeof(char));
-        sprintf(indir, "%s/", indir);
-    }
+    temp = malloc((strlen(outdir)+1) * sizeof(char));
+    strcpy(temp,outdir);
+    outdir = realloc(outdir, (strlen(outdir) + strlen("/Subcontigs/") + 1) * sizeof(char));
+    sprintf(outdir, "%s/Subcontigs/", temp);
+
+    temp = realloc(temp, (strlen(indir)+1) * sizeof(char));
+    strcpy(temp,indir);
+    indir = realloc(indir, (strlen(indir) + 2) * sizeof(char));
+    sprintf(indir, "%s/", temp);
+
+    free(temp);
+
 
     // check outdirs don't already exist
     DIR *outd;
@@ -153,6 +153,10 @@ int main(int argc, char **argv) {
                 free(genomeLocation);
             }
         }
+        if(numContigs == 0){
+            fprintf(stderr, "Error: No genomes were provided\n\n");
+            return EXIT_FAILURE;
+        }
         qsort(allContigLengths, numContigs, sizeof(int), compare);
         int sum = 0;
         for (int i = 0; i < numContigs; ++i) {
@@ -164,7 +168,7 @@ int main(int argc, char **argv) {
             contigSum += allContigLengths[i];
             ++i;
         }
-        maxSubcontigSize = allContigLengths[i-1];
+        maxSubcontigSize = i!=0 ? allContigLengths[i-1] : allContigLengths[0];
         printf("N50 is %d\n", maxSubcontigSize);
     }
 
@@ -212,7 +216,7 @@ void writeSubcontigs(char *outdir, char *excludeDir, char *genomeLocation, char 
     int seqIndex = 0;
     int contigIndex = 0;
     int subcontigLengths = 0;
-    subcontigLengths = contigLengths[contigIndex] / (contigLengths[contigIndex] / maxSubcontigSize + 1);
+    subcontigLengths = contigLengths[contigIndex] / (contigLengths[contigIndex] / (maxSubcontigSize+1) + 1);
     int start = 1;
 
     if (genome == NULL) {
@@ -246,12 +250,12 @@ void writeSubcontigs(char *outdir, char *excludeDir, char *genomeLocation, char 
             seqIndex = 0;
             free(subcontigSeq);
             free(subcontigName);
-            subcontigLengths = contigLengths[contigIndex] / (contigLengths[contigIndex] / maxSubcontigSize + 1);
+            subcontigLengths = contigLengths[contigIndex] / (contigLengths[contigIndex] / (maxSubcontigSize+1) + 1);
             subcontigSeq = calloc(subcontigLengths + 1, sizeof(char));
             subcontigName = calloc(lineLen - 1, sizeof(char));
             strncpy(subcontigName, &line[1], lineLen - 2);
 
-        } else if (seqIndex + lineLen - 2 < subcontigLengths) {
+        } else if (seqIndex + lineLen - 1 < subcontigLengths) {
             strncpy(&subcontigSeq[seqIndex], line, lineLen - 1);
             seqIndex += lineLen - 1;
         } else {
@@ -259,10 +263,23 @@ void writeSubcontigs(char *outdir, char *excludeDir, char *genomeLocation, char 
             saveSubcontig(outdir, subcontigName, strainID, subcontigSeq, start, subcontigLengths, overlapBuff);
             strcpy(overlapBuff, &subcontigSeq[strlen(subcontigSeq) - OVERLAP_LENGTH]);
             free(subcontigSeq);
+
+            // handle the case where a line is larger than the subcontig size
+            int i = 1;
+            while(lineLen - (subcontigLengths*i - seqIndex) > subcontigLengths){
+                subcontigSeq = calloc(subcontigLengths + 1, sizeof(char));
+                strncpy(subcontigSeq, line, subcontigLengths);
+                start += subcontigLengths;
+                saveSubcontig(outdir, subcontigName, strainID, subcontigSeq, start, subcontigLengths, overlapBuff);
+                strcpy(overlapBuff, &subcontigSeq[strlen(subcontigSeq) - OVERLAP_LENGTH]);
+                free(subcontigSeq);
+                ++i;
+            }
+
             subcontigSeq = calloc(subcontigLengths + 1, sizeof(char));
-            strcpy(subcontigSeq, &line[subcontigLengths - seqIndex]);
+            strcpy(subcontigSeq, &line[subcontigLengths*i - seqIndex]);
             start += subcontigLengths;
-            seqIndex += lineLen - subcontigLengths - 1;
+            seqIndex += lineLen - 1 - subcontigLengths*i;
         }
     }
 
@@ -361,7 +378,7 @@ int *getContigLengths(char *genomeLocation, int minSubcontigSize, int *contigLen
     free(line);
     fclose(genome);
     if (contigLengthsSize != NULL) {
-        *contigLengthsSize = contigIndex;
+        *contigLengthsSize = contigIndex + 1;
     }
     return contigLengths;
 }

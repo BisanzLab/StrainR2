@@ -49,7 +49,7 @@ mkdir "$outdir"
 ksize=$(("$readsize" * 2 + 1))
 
 if ! [ -z "$subcontigsize" ]; then
-  subcontigsize="-f $subcontigsize"
+  subcontigsize="-s $subcontigsize"
 fi
 
 
