@@ -255,7 +255,7 @@ void writeSubcontigs(char *outdir, char *excludeDir, char *genomeLocation, char 
             subcontigName = calloc(lineLen - 1, sizeof(char));
             strncpy(subcontigName, &line[1], lineLen - 2);
 
-        } else if (seqIndex + lineLen - 1 < subcontigLengths) {
+        } else if (seqIndex + lineLen - 1 <= subcontigLengths) {
             strncpy(&subcontigSeq[seqIndex], line, lineLen - 1);
             seqIndex += lineLen - 1;
         } else {
@@ -268,7 +268,7 @@ void writeSubcontigs(char *outdir, char *excludeDir, char *genomeLocation, char 
             int i = 1;
             while(lineLen - (subcontigLengths*i - seqIndex) > subcontigLengths){
                 subcontigSeq = calloc(subcontigLengths + 1, sizeof(char));
-                strncpy(subcontigSeq, line, subcontigLengths);
+                strncpy(subcontigSeq, &line[subcontigLengths*i + seqIndex], subcontigLengths);
                 start += subcontigLengths;
                 saveSubcontig(outdir, subcontigName, strainID, subcontigSeq, start, subcontigLengths, overlapBuff);
                 strcpy(overlapBuff, &subcontigSeq[strlen(subcontigSeq) - OVERLAP_LENGTH]);
@@ -279,7 +279,7 @@ void writeSubcontigs(char *outdir, char *excludeDir, char *genomeLocation, char 
             subcontigSeq = calloc(subcontigLengths + 1, sizeof(char));
             strcpy(subcontigSeq, &line[subcontigLengths*i - seqIndex]);
             start += subcontigLengths;
-            seqIndex += lineLen - 1 - subcontigLengths*i;
+            seqIndex = strlen(subcontigSeq);
         }
     }
 
