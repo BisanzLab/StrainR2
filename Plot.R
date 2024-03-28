@@ -67,7 +67,7 @@ ggsave(paste0(opt$abundances, "/", opt$prefix,".pdf"),pplot, device="pdf", heigh
 
 # create abundance summary file
 abundance_summary <- Norm %>% group_by(StrainID) %>% 
-  summarise(median_FUKM=median(FUKM), mean_FUKM=mean(FUKM), sd_FUKM=sd(FUKM),subcontigs_detected=length(Norm[cur_group_rows(),]$FUKM[Norm[cur_group_rows(),]$FUKM!=0]),subcontigs_total=n())
+  summarise(median_FUKM=median(FUKM, na.rm=T), mean_FUKM=mean(FUKM, na.rm=T), sd_FUKM=sd(FUKM, na.rm=T),subcontigs_detected=length(Norm[cur_group_rows(),]$FUKM[Norm[cur_group_rows(),]$FUKM!=0]),subcontigs_total=n())
 
 write_tsv(abundance_summary, paste0(opt$abundances, "/", opt$prefix,"_abundance_summary.tsv"))
 message(date(), " Plotting complete")
