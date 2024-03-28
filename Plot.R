@@ -38,6 +38,7 @@ mapped<-system(paste0("grep '#Mapped' ",opt$abundances, "/",opt$prefix,".rpkm"),
 Norm<-
   read_tsv(paste0(opt$abundances, "/",opt$prefix,".rpkm"), skip=4) %>% 
   dplyr::rename(SubcontigID=`#Name`) %>%
+  select(-Length) %>%
   right_join(
     read_tsv(paste0(opt$indir,"/KmerContent.report"), col_types="ccccid")
   ) %>%
