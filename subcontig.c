@@ -132,9 +132,9 @@ int main(int argc, char **argv) {
     }
 
     if(maxSubcontigSize==0){
-        // calculate N50
-        int *allContigLengths = malloc(1);
-        int numContigs = 0;
+        // calculate lowest N50
+        int smallestN50 = 0;
+        char* smallestN50_genome = malloc(0);
         while (((de = readdir(dr)) != NULL)) {
             if ((strlen(de->d_name) >= 4 && strcmp(&de->d_name[strlen(de->d_name) - 4], ".fna") == 0) ||
                 (strlen(de->d_name) >= 6 && strcmp(&de->d_name[strlen(de->d_name) - 6], ".fasta") == 0)) {
@@ -143,33 +143,39 @@ int main(int argc, char **argv) {
                 genomeLocation = calloc(strlen(indir) + strlen(de->d_name) + 1, sizeof(char));
                 sprintf(genomeLocation, "%s%s", indir, de->d_name);
 
-                int addedNumContigs = 0;
-                int *contigLengths = getContigLengths(genomeLocation, minSubcontigSize, &addedNumContigs);
-                allContigLengths = realloc(allContigLengths, (numContigs + addedNumContigs) * sizeof(int));
-                memcpy(&allContigLengths[numContigs], contigLengths, addedNumContigs * sizeof(int));
-                numContigs += addedNumContigs;
+                int numContigs = 0;
+                int *contigLengths = getContigLengths(genomeLocation, minSubcontigSize, &numContigs);
+                // find N50
+                qsort(contigLengths, numContigs, sizeof(int), compare);
+                int sum = 0;
+                for (int i = 0; i < numContigs; ++i) {
+                    if(contigLengths[i] > minSubcontigSize){
+                        sum += contigLengths[i];
+                    }
+                }
+                int i = 0;
+                int contigSum = 0;
+                while (contigSum < sum / 2) {
+                    if(contigLengths[i] > minSubcontigSize){
+                        contigSum += contigLengths[i];
+                    }
+                    ++i;
+                }
+                int N50 = i!=0 ? contigLengths[i-1] : contigLengths[0];
+                // see if that N50 is the smallest one
+                if(N50 < smallestN50 || smallestN50 == 0){
+                    smallestN50 = N50;
+                    smallestN50_genome = realloc(smallestN50_genome, sizeof(char)*strlen(genomeLocation));
+                    strcpy(smallestN50_genome, genomeLocation);
+                }
 
                 free(contigLengths);
                 free(genomeLocation);
             }
         }
-        if(numContigs == 0){
-            fprintf(stderr, "Error: No genomes were provided\n\n");
-            return EXIT_FAILURE;
-        }
-        qsort(allContigLengths, numContigs, sizeof(int), compare);
-        int sum = 0;
-        for (int i = 0; i < numContigs; ++i) {
-            sum += allContigLengths[i];
-        }
-        int i = 0;
-        int contigSum = 0;
-        while (contigSum < sum / 2) {
-            contigSum += allContigLengths[i];
-            ++i;
-        }
-        maxSubcontigSize = i!=0 ? allContigLengths[i-1] : allContigLengths[0];
-        printf("N50 is %d\n", maxSubcontigSize);
+        maxSubcontigSize = smallestN50;
+        printf("Smallest N50 is %d, which belongs to %s\n", maxSubcontigSize, smallestN50_genome);
+        free(smallestN50_genome);
     }
 
 
