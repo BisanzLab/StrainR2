@@ -82,7 +82,7 @@ Minimum size for subcontigs. Only contigs under the exclude size will be exclude
 
 **-s or --subcontigsize:**
 
-This option overrides the default usage of the N50 build quality statistic, which StrainR2 calculates itself. StrainR2 will optimally create subcontigs with the given size as a maximum. Leaving the max size at N50 is recommended unless if the goal is to compare how changing max subcontig size affects the output. Smaller subcontigs make StrainR2 less sensitive to low abundance strains whereas larger subcontigs make StrainR2 too sensitive and it may report false abundances for absent strains due to index hopping and other sources of false reads. 
+This option overrides the default usage of the minimum N50 build quality statistic of all inputted genomes, which StrainR2 calculates itself. StrainR2 will optimally create subcontigs with the given size as a maximum. Leaving the max size as default is recommended unless if the goal is to compare how changing max subcontig size affects the output. Smaller subcontigs make StrainR2 less sensitive to low abundance strains whereas larger subcontigs make StrainR2 too sensitive and it may report false abundances for absent strains due to index hopping and other sources of false reads. 
 
 **-r or --readsize:**
 
@@ -182,7 +182,7 @@ The following example of running StrainR2 on mock reads of the sFMT community se
 ```
 PreProcessR -i StrainR2/example_data/sFMT/ -o <output/directory/of/your/choosing>
 ```
-This will generate a StrainR2 database with default options (N50 subcontig size, 10kbp exclude size, 150bp reads), and put it in the output directory specified by the `-o` option.
+This will generate a StrainR2 database with default options (smallest N50 subcontig size, 10kbp exclude size, 150bp reads), and put it in the output directory specified by the `-o` option.
 
 `StrainR` can be run multiple times on the output of `PreProcessR`. An example using mock reads where each strain has equal coverage is given below. The data used for runs as well as the corresponding output can be found in `example_data`.
 

@@ -15,7 +15,7 @@
     "\t\t-i path/to/genomes\t: path to the directory for all community genomes\n"                                                                    \
     "\tOptional Arguments:\n"                                                                                                                        \
     "\t\t-o path/to/out\t: path to your output directory [Default = current directory]\n"                                                            \
-    "\t\t-s number\t: maximum subcontig size (overrides default use of N50) [Default = calculated N50]\n"                                            \
+    "\t\t-s number\t: maximum subcontig size (overrides default use of smallest N50) [Default = calculated N50]\n"                                   \
     "\t\t-e number\t: exclude subcontig size (minimum subcontig size) [Default = 10000]\n"                                                           \
     "\t\t-h\t\t: display this message again\n"
 

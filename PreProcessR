@@ -29,7 +29,7 @@ PreProcessR counts the unique hashes in subcontigs for StrainR to normalize read
 \tOptional Arguments:\n\
 \t\t-o/--outdir path/to/out\t\t: path to your output directory [Default = StrainR2DB]\n\
 \t\t-e/--excludesize number\t\t: exclude subcontig size (minimum subcontig size) [Default = 10000]\n\
-\t\t-s/--subcontigsize number\t: maximum subcontig size (overrides default use of calculated N50)[Default = N50]\n\
+\t\t-s/--subcontigsize number\t: maximum subcontig size (overrides default use of calculated smallest N50)[Default = N50]\n\
 \t\t-r/--readsize number\t\t: Size of one end of a read. E.g.: for 150bp paired end reads readsize is 150. All reads must be paired. [Default = 150]\n\
 \t\t-h/--help\t\t\t: Display this message\n"
             exit
