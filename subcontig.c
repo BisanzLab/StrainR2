@@ -283,7 +283,9 @@ void writeSubcontigs(char *outdir, char *excludeDir, char *genomeLocation, char 
             }
 
             subcontigSeq = calloc(subcontigLengths + 1, sizeof(char));
-            strcpy(subcontigSeq, &line[subcontigLengths*i - seqIndex]);
+            char* resized_line = calloc(strlen(line),sizeof(char));
+            strncpy(resized_line, line, strlen(line)-1);
+            strcpy(subcontigSeq, &resized_line[subcontigLengths*i - seqIndex]);
             start += subcontigLengths;
             seqIndex = strlen(subcontigSeq);
         }
