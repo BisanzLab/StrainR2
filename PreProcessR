@@ -8,6 +8,7 @@ arguments=($options)
 readsize=150
 outdir='StrainR2DB'
 excludesize=10000
+memory_efficient=""
 
 #parse options
 i=0
@@ -21,6 +22,7 @@ for argument in $options
       -r | --readsize) readsize="${arguments[i]}" ;;
       -s | --subcontigsize) subcontigsize="${arguments[i]}" ;;
       -e | --excludesize) excludesize="${arguments[i]}" ;;
+      -m | --memoryefficient) memory_efficient="-m" ;;
       -h | --help) 
             printf "USAGE: PreProcessR -i path/to/in [OPTIONS]\n\
 PreProcessR counts the unique hashes in subcontigs for StrainR to normalize reads with.\n\
@@ -29,6 +31,7 @@ PreProcessR counts the unique hashes in subcontigs for StrainR to normalize read
 \tOptional Arguments:\n\
 \t\t-o/--outdir path/to/out\t\t: path to your output directory [Default = StrainR2DB]\n\
 \t\t-e/--excludesize number\t\t: exclude subcontig size (minimum subcontig size) [Default = 10000]\n\
+\t\t-m/--memoryefficient\t\t: enable memory-efficient mode, which comes at reduced accuracy\n\
 \t\t-s/--subcontigsize number\t: maximum subcontig size (overrides default use of calculated smallest N50)[Default = N50]\n\
 \t\t-r/--readsize number\t\t: Size of one end of a read. E.g.: for 150bp paired end reads readsize is 150. All reads must be paired. [Default = 150]\n\
 \t\t-h/--help\t\t\t: Display this message\n"
@@ -53,19 +56,22 @@ if ! [ -z "$subcontigsize" ]; then
 fi
 
 
-if subcontig -i "$indir" -o "$outdir" -e "$excludesize" "$subcontigsize"; then
-  
-  echo "Subcontigs generated"
-  hashcounter.py "$outdir" "$ksize"
-  echo "Generating BBIndex"
-  mkdir "$outdir"/BBindex
-  cat "$outdir"/Subcontigs/*.subcontig "$outdir"/excludedSubcontigs/*.subcontig > "$outdir"/BBindex/BBIndex.fasta
-  bbmap.sh ref="$outdir"/BBindex/BBIndex.fasta path="$outdir"/BBindex
-  
-  else
+if ! subcontig -i "$indir" -o "$outdir" -e "$excludesize" "$subcontigsize"; then
   echo "Subcontig generation failed"
   exit
 fi
+
+num_subconts=$(printf "$(ls -l "$outdir"/Subcontigs/ | wc -l)+$(ls -l "$outdir"/excludedSubcontigs/ | wc -l)\n" | bc)
+if ! hashcounter -s "$outdir"/Subcontigs/ -e "$outdir"/excludedSubcontigs/ -k "$ksize" -o "$outdir" -n "$num_subconts" "$memory_efficient"; then
+  echo "Hashing failed"
+  exit
+fi
+
+sed -i -n -E '/;EXCLUDED_.+\tEXCLUDED_/!p' "$outdir"/kmercontent.report
+echo "Generating BBIndex"
+mkdir "$outdir"/BBindex
+cat "$outdir"/Subcontigs/*.subcontig "$outdir"/excludedSubcontigs/*.subcontig > "$outdir"/BBindex/BBIndex.fasta
+bbmap.sh ref="$outdir"/BBindex/BBIndex.fasta path="$outdir"/BBindex
 
 echo "PreProcessR complete"
 echo "Total Run Time: $((($SECONDS - $START_TIME)/60)) min $((($SECONDS - $START_TIME)%60)) sec"  
