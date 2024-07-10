@@ -357,15 +357,14 @@ void hash_and_insert(hashtable* ht, char* dir_location, void (*kmer_func)(hashta
         }
         seq = kseq_init(fileno(fp));
         kseq_read(seq);
-        //printf("name: %s\n", seq->name.s);
-        //printf("comment: %s\n", seq->comment.s);
         memcpy(subcont_location, de->d_name, strlen(de->d_name)+1);
         strtok(subcont_location, ".");
         strtok(subcont_location, "_");
         subcont_id = atoi(strtok(NULL,"_"));
         if(seq->comment.s != NULL){
-            subcont_name = calloc(strlen(seq->name.s)+strlen(seq->comment.s)+1, sizeof(char));
+            subcont_name = calloc(strlen(seq->name.s)+strlen(seq->comment.s)+2, sizeof(char));
             memcpy(subcont_name, seq->name.s, strlen(seq->name.s));
+            subcont_name[strlen(seq->name.s)] = ' ';
             strcat(subcont_name, seq->comment.s);
         } else {
             subcont_name = calloc(strlen(seq->name.s)+1, sizeof(char));
@@ -409,13 +408,13 @@ int main(int argc, char **argv){
                 num_subcontigs = atoi(optarg);
             } break;
             case 'o': {
-                outdir = calloc(strlen(optarg) + strlen("/kmercontent.report") + 1, sizeof(char));
+                outdir = calloc(strlen(optarg) + strlen("/KmerContent.report") + 1, sizeof(char));
                 strcpy(outdir, optarg);
-                strcat(outdir, "/kmercontent.report");
+                strcat(outdir, "/KmerContent.report");
             } break;
-            case 'm': {
+            /*case 'm': {
                 is_mem_efficient = true;
-            } break;
+            } break;*/
             case 'h': {
                 printf(USAGE);
                 return EXIT_SUCCESS;
@@ -476,7 +475,7 @@ int main(int argc, char **argv){
         ++i;
     }
 
-    printf("K-mers hashed and counted, the results can be found in the output directory under kmercontent.report\n");
+    printf("K-mers hashed and counted, the results can be found in the output directory under KmerContent.report\n");
 
     fclose(kmercontent);
     free(outdir);

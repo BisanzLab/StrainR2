@@ -19,7 +19,6 @@
     "\t\t-n number\t\t: number of subcontigs (excluded or not) that will be input\n"                                                                 \
     "\t\t-o path/to/outdir\t: Directory to write output file to\n"                                                                                   \
     "\tOptional Arguments:\n"                                                                                                                        \
-    "\t\t-m \t\t\t: Use this flag to enable the memory-efficient option\n"                                                                           \
     "\t\t-h\t\t\t: display this message again\n"
 
 typedef enum ht_element_status{
