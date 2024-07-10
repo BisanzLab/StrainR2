@@ -1,15 +1,15 @@
 # Background
 
-Traditional methods for quantifying strain abundances in a microbiome, such as 16S rRNA sequencing, lack the resolution to differentiate strains and are limited to generalizing species. Metagenome assembled genomes have seen a recent explosion in popularity and can quantify abundance using a metric called FPKM: mapped fragments per thousand bases per million reads. The downfall of using FPKM is a bias from highly similar genomes getting mapped to less. 
+Traditional methods for quantifying strain abundances in a microbiome, such as 16S rRNA sequencing, lack the resolution to differentiate strains and are limited to generalizing species. Shotgun metagenomic sequencing offers an alternative, but unnormalized abundances such as FPKM have a bias from similar genomes getting fewer unique mappings. 
 
-Metagenomic methods that have been developed to remove the bias are inaccurate and scale poorly to larger communities. Abundances are off by magnitudes when strains have low coverage. They also produce these results after hours or days of computation with demanding resource usage. 
+Other metagenomic methods developed to remove this bias, such as NinjaMap or StrainR1, are inaccurate and scale poorly to larger communities. Abundances are off by magnitudes especially when strains have low coverage, and computational resources scale poorly.
 
-StrainR2 is a solution that quantifies strain abundances to within a couple of percent of the true value in a fraction of the time that traditional methods use. 
+StrainR2 is a solution that quantifies strain abundances using shotgun metagenomic sequencing to within a couple of percent of the true value in a fraction of the time that traditional methods use. 
 
 
 # Installation
 
-StrainR2 is made for linux based operating systems. Dependencies are listed at the bottom of this README, but using conda is highly recommended for reproducibility.
+StrainR2 is made for unix-like operating systems. Dependencies are listed at the bottom of this README, but using conda is highly recommended for reproducibility.
 
 ### Option A: Bioconda (recommended)
 Conda can be installed from the command line and is highly recommended for managing package dependencies.
@@ -39,10 +39,11 @@ conda activate strainr2
 ```
 In addition subcontig.c will need to be compiled and executeable files will need executeable permissions:
 ```
-gcc StrainR2/subcontig.c -o StrainR2/subcontig
+gcc StrainR2/subcontig.c -o StrainR2/subcontig -O3
+gcc StrainR2/hashcounter.c -o StrainR2/hashcounter -O3
 chmod +x StrainR2/subcontig
+chmod +x StrainR2/hashcounter
 chmod +x StrainR2/PreProcessR
-chmod +x StrainR2/hashcounter.py
 chmod +x StrainR2/StrainR
 chmod +x StrainR2/Plot.R
 ```
@@ -57,9 +58,9 @@ export PATH="$PATH:~/absolute/path/to/StrainR2"
 StrainR2 is split into two steps: `PreProcessR` and `StrainR`. 
 
 ### PreProcessR 
-`PreProcessR` creates a database for future runs of `StrainR` to use. It will split genome contigs into subcontigs to ensure similar genome build qualities, with contigs below a preset value (10kbp by default) being marked as "exluded". Excluded subcontigs have their k-mers marked as unique, but will not have their FUKM calculated. K-mers in eaach subconig are then compared to all other k-mers in the set of genomes to determine which ones are unique. Information about the count of unique k-mers is stored to KmerContent.report. In addition preprocessing will generate a `BBMap` index for later use. All of these files will be in the specified output directory.
+`PreProcessR` creates a database for future runs of `StrainR` to use. It will split genome contigs into subcontigs to ensure similar genome build qualities, with the contigs that are below a preset value (10kbp by default) being marked as "exluded". Information about the count of unique k-mers is stored to KmerContent.report. In addition preprocessing will generate a `BBMap` index for later use. All of these files will be in the specified output directory.
 
-`PreProcessR` will require the most memory. However, it only needs to run once for a given community of genomes and its output can be reused any number of times by `StrainR`. For large run sizes, it may be necessary to increase the size of swap space to facilitate memory needs. This would only be needed if `PreProcessR` crashes due to exceeding memory constraints.
+`PreProcessR` only needs to run once for a given community of genomes and its output can be reused any number of times by `StrainR`. For large run sizes, it may be necessary to increase the size of swap space to facilitate memory needs. This would only be needed if `PreProcessR` crashes due to exceeding memory constraints.
 
 The `PreProcessR` command can be invoked from the command line as follows:
 ```
@@ -78,15 +79,15 @@ Path to desired directory for output files to be stored in. Directory does not n
 
 **-e or --excludesize:**
 
-Minimum size for subcontigs. Only contigs under the exclude size will be excluded. Default is 10000
+Minimum size for subcontigs. Only contigs under the exclude size will be excluded. Default = 10,000
 
 **-s or --subcontigsize:**
 
-This option overrides the default usage of the minimum N50 build quality statistic of all inputted genomes, which StrainR2 calculates itself. StrainR2 will optimally create subcontigs with the given size as a maximum. Leaving the max size as default is recommended unless if the goal is to compare how changing max subcontig size affects the output. Smaller subcontigs make StrainR2 less sensitive to low abundance strains whereas larger subcontigs make StrainR2 too sensitive and it may report false abundances for absent strains due to index hopping and other sources of false reads. 
+This option overrides the default usage of the minimum N50 build quality statistic of all inputted genomes, which StrainR2 calculates itself. StrainR2 will optimally create subcontigs with the given size as a maximum. Leaving the max size as default is recommended. Smaller subcontigs make StrainR2 less sensitive to low abundance strains whereas larger subcontigs make StrainR2 too sensitive and it may report false abundances for absent strains due to index hopping, read errors, and other sources of false reads. 
 
 **-r or --readsize:**
 
-The size of one end of your paired end reads. 150 by default.
+The size of one end of your paired end reads. 150 by default. To be used to calculate a k-mer size.
 
 <p>&nbsp;</p>
 
@@ -112,6 +113,14 @@ path to reverse reads (reads do not have to be in .gz)
 
 path to the output directory generated by `PreProcessR` (the directory that was the outout for `PreProcessR`)
 
+**-c or --weightedpercentile:**
+
+The weighted percentile of a strain's subcontig's FUKMs to be used for final abundance calculation (weighted by the number of unique k-mers). Adjusting this to be higher will increase sensitivity but make false positives more likely. Conversely, decreasing this number will increase the likelihood of false negatives. Default = 60 
+
+**-s or --subcontigfilter:**
+
+The percentage of subcontigs that should get filtered out on the basis of having too few unique k-mers. Default = 0
+
 **-o or --outdir:**
 
 path to your output directory to contain normalized abundances. Default = current directory
@@ -122,15 +131,11 @@ Name of community (used for output file names). Default = "sample"
 
 **-t or --threads number:**
 
-number of threads to use when running `fastp`, `BBMap`, and `samtools`. Maximum is 16, default = 8.
+number of threads to use when running `fastp`, `BBMap`, and `samtools`. Maximum is 16, default = 8
 
 **-m or --mem number:**
 
-gigabytes of memory to use when running `BBMap`. Default = 8.
-
-**-s or --scratch string:** 
-
-name of temporary directory used during run time [Default = tmp]
+gigabytes of memory to use when running `BBMap`. Default = 8
 
 <p>&nbsp;</p>
 
@@ -148,7 +153,7 @@ Start_Stop: Nucleotides at which the subcontig starts and stops. Counting starts
 
 Length: Number of basepairs in subcontig
 
-Nunique: Number of unique kmers in subcontig
+Nunique: Number of unique k-mers in subcontig
 
 
 ### The .abundance file is formatted into the following columns:
@@ -163,15 +168,19 @@ FUKM: StrainR2-calculated strain abundance
 
 StrainID: Name of the fasta file for which summary statistics will be provided.
 
-mean_FUKM, median_FUKM, sd_FUKM: Mean, median, and standard deviation of all subcontig FUKMs in the strain
+weighted_percentile_FUKM, median_FUKM, sd_FUKM: Weighted percentile (per `StrainR`'s `-c` option), median, and standard deviation of all subcontig FUKMs in the strain
 
 subcontigs_detected: The number of subcontigs that had an FUKM>0
 
-subcontigs_total: The total number of subcontigs for the strain.
+subcontigs_total: The total number of subcontigs for the strain
+
+percent_detected: subcontigs_detected / subcontigs_total
+
+percent_abundance: weighted_percentile_FUKM / sum of all weighted_percentile_FUKM in the community
 
 <p>&nbsp;</p>
 
-In addition, `StrainR` provides a plot for FUKM abundances. Median FUKM is the recommended measure of strain abundance.
+In addition, `StrainR` provides a plot for FUKM abundances. Weighted percentile FUKM is the recommended measure of strain abundance.
 
 
 <p>&nbsp;</p>
@@ -195,7 +204,6 @@ Abundance data will be put in the directory specified after `-o`. This includes 
 
 # Dependencies
 
- * sourmash >4.0.0
  * BBMap
  * fastp
  * samtools

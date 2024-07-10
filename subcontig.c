@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <getopt.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -131,6 +132,14 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
+    if(minSubcontigSize >= 250000){
+        fprintf(stderr, "Error: Minimum subcontig size is too large, please set it to be less than 250,000");
+        return EXIT_FAILURE;
+    }
+    if(minSubcontigSize <= 5000){
+        fprintf(stderr, "Warning: It is strongly recommended not to set Minimum subcontig size to be smaller than 5000 to ensure multi-copy elements are not present");
+    }
+
     if(maxSubcontigSize==0){
         // calculate lowest N50
         int smallestN50 = 0;
@@ -165,7 +174,7 @@ int main(int argc, char **argv) {
                 // see if that N50 is the smallest one
                 if(N50 < smallestN50 || smallestN50 == 0){
                     smallestN50 = N50;
-                    smallestN50_genome = realloc(smallestN50_genome, sizeof(char)*strlen(genomeLocation));
+                    smallestN50_genome = realloc(smallestN50_genome, sizeof(char)*strlen(genomeLocation)+1);
                     strcpy(smallestN50_genome, genomeLocation);
                 }
 
@@ -178,6 +187,14 @@ int main(int argc, char **argv) {
         free(smallestN50_genome);
     }
 
+    if(maxSubcontigSize > 250000){
+        fprintf(stdout, "Warning: Subcontig size can not be larger than 250Kb -- setting subcontig size to 250,000");
+        maxSubcontigSize = 250000;
+    }
+    if(maxSubcontigSize < minSubcontigSize + 1000){
+        fprintf(stdout, "Warning: Max subcontig size is too small -- setting it to the exclude size + 1000 bases (%d bases)", minSubcontigSize + 1000);
+        maxSubcontigSize = minSubcontigSize + 1000;
+    }
 
     closedir(dr);
     dr = opendir(indir);
