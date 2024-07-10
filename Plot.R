@@ -75,7 +75,7 @@ abundance_summary <- Norm %>% group_by(StrainID) %>%
     sd_FUKM=sd(FUKM, na.rm=T),
     subcontigs_detected=length(FUKM[FUKM!=0]),
     subcontigs_total=n(),
-    percent_detected=length(FUKM[FUKM!=0])/n()
+    percent_detected=length(FUKM[FUKM!=0])/n() * 100
   ) %>%
   mutate(percent_abundance = weighted_percentile_FUKM / sum(weighted_percentile_FUKM) * 100)
 

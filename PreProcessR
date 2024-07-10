@@ -67,10 +67,13 @@ if ! hashcounter -s "$outdir"/Subcontigs/ -e "$outdir"/excludedSubcontigs/ -k "$
   exit
 fi
 
-sed -i -n -E '/;EXCLUDED_.+\tEXCLUDED_/!p' "$outdir"/kmercontent.report
+sed -i -n -E '/;EXCLUDED_.+\tEXCLUDED_/!p' "$outdir"/KmerContent.report
 echo "Generating BBIndex"
 mkdir "$outdir"/BBindex
-cat "$outdir"/Subcontigs/*.subcontig "$outdir"/excludedSubcontigs/*.subcontig > "$outdir"/BBindex/BBIndex.fasta
+ls "$outdir"/Subcontigs/ | sed -n '/\.subcontig$/p' | sed 's|^|'"$outdir"'/Subcontigs/|' | \
+  xargs cat > "$outdir"/BBindex/BBIndex.fasta
+ls "$outdir"/excludedSubcontigs/ | sed -n '/\.subcontig$/p' | sed 's|^|'"$outdir"'/excludedSubcontigs/|' | \
+  xargs cat >> "$outdir"/BBindex/BBIndex.fasta
 bbmap.sh ref="$outdir"/BBindex/BBIndex.fasta path="$outdir"/BBindex
 
 echo "PreProcessR complete"
