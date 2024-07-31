@@ -182,24 +182,6 @@ percent_abundance: weighted_percentile_FUKM / sum of all weighted_percentile_FUK
 
 In addition, `StrainR` provides a plot for FUKM abundances. Weighted percentile FUKM is the recommended measure of strain abundance.
 
-
-<p>&nbsp;</p>
-
-# Example Run
-
-The following example of running StrainR2 on mock reads of the sFMT community serves as an example of usage as well as a way to verify reproducibility. Genomes of sFMT strains as well as mock read files are provided in `example_data`. The following command creates a StrainR2 data base which can be used by the `StrainR` command for all subsequent read analysis. 
-```
-PreProcessR -i StrainR2/example_data/sFMT/ -o <output/directory/of/your/choosing>
-```
-This will generate a StrainR2 database with default options (smallest N50 subcontig size, 10kbp exclude size, 150bp reads), and put it in the output directory specified by the `-o` option.
-
-`StrainR` can be run multiple times on the output of `PreProcessR`. An example using mock reads where each strain has equal coverage is given below. The data used for runs as well as the corresponding output can be found in `example_data`.
-
-```
-StrainR -1 StrainR2/example_data/mock_reads/shallow_uniform_R1.fastq.gz -2 StrainR2/example_data/mock_reads/shallow_uniform_R2.fastq.gz -r <your/preprocessr/output/directory> -p shallow_uniform -o <output/directory/of/your/choosing>
-```
-Abundance data will be put in the directory specified after `-o`. This includes a plot of abundances, which in the case of the provided mock reads will be very close to uniform. Due to the provided reads having low coverage to keep file sizes small, subcontig FUKMs will have a larger spread than usual. We recommend using median_FUKM as the measure of abundance for strains.
-
 <p>&nbsp;</p>
 
 # Dependencies
