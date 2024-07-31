@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <zlib.h>
 
 #define INITIAL_HT_SIZE 33554432 // 2^25 entries, hashtable will initially use 0.5 GiB in memory
 #define INITIAL_HT_BITMASK 0x1FFFFFF // 25 1s

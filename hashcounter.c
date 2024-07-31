@@ -9,7 +9,7 @@
  * Values are the status of the k-mer (i.e. unique or not) and also the id of the subcontig from which it originates
  */
 
-KSEQ_INIT(int, read);
+KSEQ_INIT(gzFile, gzread);
 
 hashtable* hashtable_create(uint32_t kmer_size, bool is_small, uint32_t num_subconts){
     hashtable* ht = (hashtable*) malloc(sizeof(hashtable));
@@ -350,12 +350,12 @@ void hash_and_insert(hashtable* ht, char* dir_location, void (*kmer_func)(hashta
         subcont_location = calloc(loc_size, sizeof(char));
         strcpy(subcont_location, dir_location);
         subcont_location = strcat(subcont_location, de->d_name);
-        FILE* fp = fopen(subcont_location,"r");
+        gzFile fp = gzopen(subcont_location,"r");
         if(fp == NULL){
             fprintf(stderr, "Error opening %s\n", de->d_name);
             exit(EXIT_FAILURE);
         }
-        seq = kseq_init(fileno(fp));
+        seq = kseq_init(fp);
         kseq_read(seq);
         memcpy(subcont_location, de->d_name, strlen(de->d_name)+1);
         strtok(subcont_location, ".");
@@ -373,7 +373,7 @@ void hash_and_insert(hashtable* ht, char* dir_location, void (*kmer_func)(hashta
         ht->subcontig_names[subcont_id] = subcont_name;
         hash_and_insert_subcontig(ht, seq->seq.s, subcont_id, kmer_func);
         free(subcont_location);
-        fclose(fp);
+        gzclose(fp);
         kseq_destroy(seq);
     }
     closedir(dr);
