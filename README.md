@@ -37,20 +37,15 @@ Dependencies need to be installed according to versions listed at the bottom of 
 conda env create -f StrainR2/strainr2.yml
 conda activate strainr2
 ```
-In addition subcontig.c will need to be compiled and executeable files will need executeable permissions:
+
+Files can be compiled using make
 ```
-gcc StrainR2/subcontig.c -o StrainR2/subcontig -O3
-gcc StrainR2/hashcounter.c -o StrainR2/hashcounter -O3
-chmod +x StrainR2/subcontig
-chmod +x StrainR2/hashcounter
-chmod +x StrainR2/PreProcessR
-chmod +x StrainR2/StrainR
-chmod +x StrainR2/Plot.R
+cd StrainR2/src
+make release
 ```
-Note that if StrainR2 is installed from source, the directory containing source files (the cloned git directory) needs to be added to your path every time a new shell is started. Replace `~/absolute/path/to` with the absolute path to the StrainR2 clone directory.
-```
-export PATH="$PATH:~/absolute/path/to/StrainR2"
-```
+
+Note that if StrainR2 is installed from source, code needs to be run by referencing the appropriate files in the `src` directory directly.
+
 <p>&nbsp;</p>
 
 # Usage
@@ -188,9 +183,12 @@ In addition, `StrainR` provides a plot for FUKM abundances. Weighted percentile 
 
  * BBMap
  * fastp
+ * GNU make (if compiling from source)
  * samtools
  * R
+ * R optparse
  * R tidyverse
+ * zlib
 
 # Credits:
 Paper: \<Link to paper to be added when published\>
