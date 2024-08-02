@@ -62,6 +62,9 @@ ggsave(paste0(opt$abundances, "/", opt$prefix,".pdf"),pplot, device="pdf", heigh
 weighted.percentile <- function(values, weights) {
   weights <- weights[order(values)]
   values <- values[order(values)]
+  
+  weights <- weights[!is.na(values)]
+  values <- values[!is.na(values)]
 
   weighted_percentiles <- cumsum(weights)/sum(weights)
   percentile_index <- detect_index(weighted_percentiles, function(x) x - opt$weightedpercentile/100 >= 0)

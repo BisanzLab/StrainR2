@@ -9,7 +9,7 @@
  * Values are the status of the k-mer (i.e. unique or not) and also the id of the subcontig from which it originates
  */
 
-KSEQ_INIT(gzFile, gzread);
+KSEQ_INIT(gzFile, gzread)
 
 hashtable* hashtable_create(uint32_t kmer_size, bool is_small, uint32_t num_subconts){
     hashtable* ht = (hashtable*) malloc(sizeof(hashtable));
@@ -72,7 +72,7 @@ ht_element* hashtable_insert(hashtable* ht, uint64_t key, ht_element_status stat
         if(current_item->key == key) return current_item;
         ++current_item;
         // reset to beginning of hashtable if end is reached
-        if(current_item - ht->items == ht->size) current_item = ht->items;
+        if((uint64_t)(current_item - ht->items) == ht->size) current_item = ht->items;
     }
     current_item->key = key;
     current_item->status = status;
@@ -88,7 +88,7 @@ ht_element_small* hashtable_insert_small(hashtable* ht, uint32_t key, ht_element
         if(current_item->key == key) return current_item;
         ++current_item;
         // reset to beginning of hashtable if end is reached
-        if(current_item - ht->items_small == ht->size) current_item = ht->items_small;
+        if((uint64_t)(current_item - ht->items_small) == ht->size) current_item = ht->items_small;
     }
     current_item->key = key;
     ht_small_set_status(current_item, status);
@@ -98,7 +98,7 @@ ht_element_small* hashtable_insert_small(hashtable* ht, uint32_t key, ht_element
 
 // double ht size and re-enter all elements from left to right
 void hashtable_resize(hashtable* ht){
-    if(ht->is_small) return hashtable_resize_small(ht);
+    if(ht->is_small){hashtable_resize_small(ht); return;}
     ht->size *= 2;
     printf("Hashtable is resizing, new size will use ~ %ld GiB of memory\n", ht->size/INITIAL_HT_SIZE/2);
     uint64_t changed_bit = ht->entry_bitmask;
@@ -147,7 +147,7 @@ void hashtable_resize_small(hashtable* ht){
 // return the sum of all unique hashes
 uint64_t sum_unique_hahses(hashtable* ht){
     uint64_t sum = 0;
-    for(int i=0; i<ht->num_subcontigs; ++i){
+    for(uint32_t i=0; i<ht->num_subcontigs; ++i){
         sum+=ht->subcontig_counts[i];
     }
     return sum;
@@ -210,13 +210,13 @@ uint64_t MurmurHash64A (const void* key, int len, uint64_t seed){
     }
     const unsigned char * data2 = (const unsigned char*)data;
     switch(len & 7){
-        case 7: h ^= (uint64_t)(data2[6]) << 48;
-        case 6: h ^= (uint64_t)(data2[5]) << 40;
-        case 5: h ^= (uint64_t)(data2[4]) << 32;
-        case 4: h ^= (uint64_t)(data2[3]) << 24;
-        case 3: h ^= (uint64_t)(data2[2]) << 16;
-        case 2: h ^= (uint64_t)(data2[1]) << 8;
-        case 1: h ^= (uint64_t)(data2[0]);
+        case 7: h ^= (uint64_t)(data2[6]) << 48; break;
+        case 6: h ^= (uint64_t)(data2[5]) << 40; break;
+        case 5: h ^= (uint64_t)(data2[4]) << 32; break;
+        case 4: h ^= (uint64_t)(data2[3]) << 24; break;
+        case 3: h ^= (uint64_t)(data2[2]) << 16; break;
+        case 2: h ^= (uint64_t)(data2[1]) << 8; break;
+        case 1: h ^= (uint64_t)(data2[0]); break;
             h *= m;
     };
     h ^= h >> r;
@@ -250,9 +250,9 @@ uint32_t MurmurHash3_x86_32(const void* key, int len, uint32_t seed){
     const uint8_t* tail = (const uint8_t*)(data + nblocks*4);
     uint32_t k1 = 0;
     switch(len & 3){
-    case 3: k1 ^= tail[2] << 16;
-    case 2: k1 ^= tail[1] << 8;
-    case 1: k1 ^= tail[0];
+    case 3: k1 ^= tail[2] << 16; break;
+    case 2: k1 ^= tail[1] << 8; break;
+    case 1: k1 ^= tail[0]; break;
             k1 *= c1; k1 = (k1 << 15) | (k1 >> 17); k1 *= c2; h1 ^= k1;
     };
 
@@ -308,14 +308,14 @@ void hash_and_insert_subcontig(hashtable* ht, char* seq, uint32_t subcontig_id, 
     char* rc = reverse_complement(seq);
     uint32_t n;
     uint32_t seq_len = strlen(seq);
-    while(n=check_n(&seq[i], ht->kmer_size)){
+    while((n=check_n(&seq[i], ht->kmer_size))){
         i+=n;
     }
     while(ht->kmer_size + i <= seq_len){
         if(seq[i+ht->kmer_size-1]=='N'){
             i+=ht->kmer_size;
             if(i+ht->kmer_size > seq_len) break;
-            while(n=check_n(&seq[i], ht->kmer_size)) i+=n;
+            while((n=check_n(&seq[i], ht->kmer_size))) i+=n;
             continue;
         }
     
@@ -381,15 +381,15 @@ void hash_and_insert(hashtable* ht, char* dir_location, void (*kmer_func)(hashta
 
 int main(int argc, char **argv){
     int opt;
-    char *subcontigs = NULL;
-    char *exc_subcontigs = NULL;
-    char *outdir = NULL;
+    char* subcontigs = NULL;
+    char* exc_subcontigs = NULL;
+    char* outdir = NULL;
     uint32_t kmer_size = 0;
     bool is_mem_efficient = false;
     uint32_t num_subcontigs = 0;
 
     // parse options
-    while ((opt = getopt(argc, argv, "s:e:k:n:o:mh")) != -1) {
+    while ((opt = getopt(argc, argv, "s:e:k:n:o:h")) != -1) {
         switch (opt) {
             case 's': {
                 subcontigs = calloc(strlen(optarg) + 2, sizeof(char));

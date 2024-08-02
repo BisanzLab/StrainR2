@@ -143,7 +143,7 @@ int main(int argc, char **argv) {
     if(maxSubcontigSize==0){
         // calculate lowest N50
         int smallestN50 = 0;
-        char* smallestN50_genome = malloc(0);
+        char* smallestN50_genome = calloc(1,1);
         while (((de = readdir(dr)) != NULL)) {
             if ((strlen(de->d_name) >= 4 && strcmp(&de->d_name[strlen(de->d_name) - 4], ".fna") == 0) ||
                 (strlen(de->d_name) >= 6 && strcmp(&de->d_name[strlen(de->d_name) - 6], ".fasta") == 0)) {
@@ -181,6 +181,10 @@ int main(int argc, char **argv) {
                 free(contigLengths);
                 free(genomeLocation);
             }
+        }
+        if(*smallestN50_genome == '\0'){
+            fprintf(stderr, "No valid files found in input directory (in .fasta or .fna format)");
+            return EXIT_FAILURE;
         }
         maxSubcontigSize = smallestN50;
         printf("Smallest N50 is %d, which belongs to %s\n", maxSubcontigSize, smallestN50_genome);
@@ -300,12 +304,20 @@ void writeSubcontigs(char *outdir, char *excludeDir, char *genomeLocation, char 
             }
 
             subcontigSeq = calloc(subcontigLengths + 1, sizeof(char));
-            char* resized_line = calloc(strlen(line),sizeof(char));
-            strncpy(resized_line, line, strlen(line)-1);
-            strcpy(subcontigSeq, &resized_line[subcontigLengths*i - seqIndex]);
+            line[strlen(line)-1] = '\0';
+            strcpy(subcontigSeq, &line[subcontigLengths*i - seqIndex]);
             start += subcontigLengths;
             seqIndex = strlen(subcontigSeq);
         }
+    }
+
+    if (seqIndex >= minSubcontigSize) {
+        saveSubcontig(outdir, subcontigName, strainID, subcontigSeq, start, seqIndex, overlapBuff);
+    } else if (seqIndex >= OVERLAP_LENGTH) {
+        char *excludedSubcontigName = calloc(strlen(subcontigName) + 10, sizeof(char));
+        sprintf(excludedSubcontigName, "EXCLUDED_%s", subcontigName);
+        saveSubcontig(excludeDir, excludedSubcontigName, strainID, subcontigSeq, start, seqIndex, overlapBuff);
+        free(excludedSubcontigName);
     }
 
     free(subcontigSeq);
