@@ -133,11 +133,11 @@ int main(int argc, char **argv) {
     }
 
     if(minSubcontigSize >= 250000){
-        fprintf(stderr, "Error: Minimum subcontig size is too large, please set it to be less than 250,000");
+        fprintf(stderr, "Error: Minimum subcontig size is too large, please set it to be less than 250,000\n");
         return EXIT_FAILURE;
     }
     if(minSubcontigSize <= 5000){
-        fprintf(stderr, "Warning: It is strongly recommended not to set Minimum subcontig size to be smaller than 5000 to ensure multi-copy elements are not present");
+        fprintf(stderr, "Warning: It is strongly recommended not to set Minimum subcontig size to be smaller than 5000 to ensure multi-copy elements are not present\n");
     }
 
     if(maxSubcontigSize==0){
@@ -183,7 +183,7 @@ int main(int argc, char **argv) {
             }
         }
         if(*smallestN50_genome == '\0'){
-            fprintf(stderr, "No valid files found in input directory (in .fasta or .fna format)");
+            fprintf(stderr, "No valid files found in input directory (in .fasta or .fna format)\n");
             return EXIT_FAILURE;
         }
         maxSubcontigSize = smallestN50;
@@ -192,11 +192,11 @@ int main(int argc, char **argv) {
     }
 
     if(maxSubcontigSize > 250000){
-        fprintf(stdout, "Warning: Subcontig size can not be larger than 250Kb -- setting subcontig size to 250,000");
+        fprintf(stdout, "Warning: Subcontig size can not be larger than 250Kb -- setting subcontig size to 250,000\n");
         maxSubcontigSize = 250000;
     }
     if(maxSubcontigSize < minSubcontigSize + 1000){
-        fprintf(stdout, "Warning: Max subcontig size is too small -- setting it to the exclude size + 1000 bases (%d bases)", minSubcontigSize + 1000);
+        fprintf(stdout, "Warning: Max subcontig size is too small -- setting it to the exclude size + 1000 bases (%d bases)\n", minSubcontigSize + 1000);
         maxSubcontigSize = minSubcontigSize + 1000;
     }
 

@@ -10,7 +10,7 @@ all: subcontig hashcounter
 release: CFLAGS += -O3 # release flags
 release: clean all
 
-debug: CFLAGS += -O0 -fsanitize=undefined # debug flags
+debug: CFLAGS += -O0 -fsanitize=address # debug flags
 debug: clean all
 
 subcontig: subcontig.o
@@ -26,4 +26,4 @@ clean:
 	@rm subcontig hashcounter $(OBJS) 2> /dev/null || true
 
 test: subcontig hashcounter
-	@../test/test.sh
+	@../tests/test.sh

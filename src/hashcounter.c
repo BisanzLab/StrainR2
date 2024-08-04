@@ -437,7 +437,7 @@ int main(int argc, char **argv){
     }
 
     printf("Hashing and counting k-mers\n");
-    hashtable* ht = hashtable_create(kmer_size, is_mem_efficient, num_subcontigs);
+    hashtable* ht = hashtable_create(kmer_size, is_mem_efficient, num_subcontigs+1);
 
     // main pipeline
     if(is_mem_efficient){
