@@ -1,4 +1,4 @@
-[![Testing](https://github.com/kheber/StrainR2_testing/actions/workflows/testing.yml/badge.svg)](https://github.com/kheber/StrainR2_testing/actions/workflows/testing.yml)
+[![Testing](https://github.com/BisanzLab/StrainR2/actions/workflows/testing.yml/badge.svg)](https://github.com/BisanzLab/StrainR2/actions/workflows/testing.yml)
 [![StrainR2 Version](https://anaconda.org/bioconda/strainr2/badges/version.svg)](https://anaconda.org/bioconda/strainr2)
 [![Downloads](https://anaconda.org/bioconda/strainr2/badges/downloads.svg)](https://anaconda.org/bioconda/strainr2)
 # Background
