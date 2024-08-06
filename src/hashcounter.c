@@ -16,6 +16,7 @@ hashtable* hashtable_create(uint32_t kmer_size, bool is_small, uint32_t num_subc
     ht->subcontig_names = calloc(num_subconts,sizeof(char*));
     ht->subcontig_counts = calloc(num_subconts,sizeof(int));
     ht->num_subcontigs = num_subconts;
+    ht->curr_subcontig = 0;
     ht->size = INITIAL_HT_SIZE;
     ht->count = 0;
     ht->entry_bitmask = INITIAL_HT_BITMASK;
@@ -338,12 +339,11 @@ void hash_and_insert(hashtable* ht, char* dir_location, void (*kmer_func)(hashta
     struct dirent *de;
     DIR *dr = opendir(dir_location);
     if(dr == NULL) {
-        fprintf(stderr, "Could not open excluded subcontigs directory\n\n");
+        fprintf(stderr, "Could not open subcontigs directory\n\n");
         exit(EXIT_FAILURE);
     }
     char* subcont_location;
     char* subcont_name;
-    uint32_t subcont_id;
     while (((de = readdir(dr)) != NULL)) {
         if(!(strlen(de->d_name) >= 10 && strcmp(&de->d_name[strlen(de->d_name) - 10], ".subcontig") == 0)) continue;
         uint32_t loc_size = strlen(dir_location)+strlen(de->d_name)+1;
@@ -357,10 +357,6 @@ void hash_and_insert(hashtable* ht, char* dir_location, void (*kmer_func)(hashta
         }
         seq = kseq_init(fp);
         kseq_read(seq);
-        memcpy(subcont_location, de->d_name, strlen(de->d_name)+1);
-        strtok(subcont_location, ".");
-        strtok(subcont_location, "_");
-        subcont_id = atoi(strtok(NULL,"_"));
         if(seq->comment.s != NULL){
             subcont_name = calloc(strlen(seq->name.s)+strlen(seq->comment.s)+2, sizeof(char));
             memcpy(subcont_name, seq->name.s, strlen(seq->name.s));
@@ -370,8 +366,9 @@ void hash_and_insert(hashtable* ht, char* dir_location, void (*kmer_func)(hashta
             subcont_name = calloc(strlen(seq->name.s)+1, sizeof(char));
             memcpy(subcont_name, seq->name.s, strlen(seq->name.s));
         }
-        ht->subcontig_names[subcont_id] = subcont_name;
-        hash_and_insert_subcontig(ht, seq->seq.s, subcont_id, kmer_func);
+        ht->subcontig_names[ht->curr_subcontig] = subcont_name;
+        hash_and_insert_subcontig(ht, seq->seq.s, ht->curr_subcontig, kmer_func);
+        ++ht->curr_subcontig;
         free(subcont_location);
         gzclose(fp);
         kseq_destroy(seq);
@@ -463,7 +460,7 @@ int main(int argc, char **argv){
         return EXIT_FAILURE;
     }
     fprintf(kmercontent,"SubcontigID\tStrainID\tContigID\tStart_Stop\tLength\tNunique\n");
-    uint32_t i=1;
+    uint32_t i=0;
     while(ht->subcontig_names[i]!=NULL){
         fprintf(kmercontent,"%s\t", ht->subcontig_names[i]);
         subcontig_info = strtok(ht->subcontig_names[i], ";");

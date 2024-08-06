@@ -73,7 +73,7 @@ ls "$outdir"/Subcontigs/ | sed -n '/\.subcontig$/p' | sed 's|^|'"$outdir"'/Subco
   xargs cat > "$outdir"/BBindex/BBIndex.fasta
 ls "$outdir"/excludedSubcontigs/ | sed -n '/\.subcontig$/p' | sed 's|^|'"$outdir"'/excludedSubcontigs/|' | \
   xargs cat >> "$outdir"/BBindex/BBIndex.fasta
-bbmap.sh ref="$outdir"/BBindex/BBIndex.fasta path="$outdir"/BBindex
+bbmap.sh ref="$outdir"/BBindex/BBIndex.fasta path="$outdir"/BBindex deterministic=t averagepairdist=200
 
 echo "PreProcessR complete"
 echo "Total Run Time: $((($SECONDS - $START_TIME)/60)) min $((($SECONDS - $START_TIME)%60)) sec"  

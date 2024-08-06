@@ -20,14 +20,6 @@
     "\t\t-e number\t: exclude subcontig size (minimum subcontig size) [Default = 10000]\n"                                                           \
     "\t\t-h\t\t: display this message again\n"
 
-// for testing purposes this code was compiled with:
-// gcc -g -fsanitize=address -std=gnu99 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter -O0 -o subcontig subcontig.c
-
-// the provided binary was compiled using:
-// gcc -o subcontig subcontig.c
-
-int subcontigCount = 0;
-
 // save a sequence and appropriate header information to outdir (or excludedSubcontigs if it is less than minSubcontigSize)
 void saveSubcontig(char *outdir, char *subcontigName, char *strainID, char *subcontigSeq, int start, int length, char *overlap);
 // subcontig a genome and write the sequences to outdir
@@ -331,7 +323,6 @@ void writeSubcontigs(char *outdir, char *excludeDir, char *genomeLocation, char 
 // (called from by writeSubcontigs)
 void saveSubcontig(char *outdir, char *subcontigName, char *strainID, char *subcontigSeq, int start, int length, char *overlap) {
     FILE *fptr = NULL;
-    ++subcontigCount;
     char *seq = NULL;
     int overlapLen = 0;
 
@@ -349,9 +340,9 @@ void saveSubcontig(char *outdir, char *subcontigName, char *strainID, char *subc
     char *savedSubcontigName = calloc(needed, sizeof(char));
     sprintf(savedSubcontigName, ">%s;%s;%d_%d;%d", strainID, subcontigName, start - overlapLen, start + length - 1, length + overlapLen);
 
-    needed = snprintf(NULL, 0, "%ssubcontig_%d.subcontig", outdir, subcontigCount) + 1;
+    needed = snprintf(NULL, 0, "%s/%s_%d_%d.subcontig", outdir, strainID, start - overlapLen, start + length - 1) + 1;
     char *subcontigLocation = calloc(needed, sizeof(char));
-    sprintf(subcontigLocation, "%ssubcontig_%d.subcontig", outdir, subcontigCount);
+    sprintf(subcontigLocation, "%s/%s_%d_%d.subcontig", outdir, strainID, start - overlapLen, start + length - 1);
 
     fptr = fopen(subcontigLocation, "w");
     if (fptr == NULL) {

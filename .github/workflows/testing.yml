@@ -1,0 +1,57 @@
+name: Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test_preprocessr:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      - name: make test
+        run: make -C src test
+
+  test_strainr:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: r-lib/actions/setup-r@v2
+    - uses: r-lib/actions/setup-r-dependencies@v2
+      with:
+        cache-version: 1
+        r-version: 'release'
+        packages: |
+          any::tidyverse
+          any::optparse
+
+    - name: Plot.R test
+      run: |
+        ./src/Plot.R -a tests/inputs/ -i tests/inputs/ -p testing
+        diff tests/inputs/testing_abundance_summary.tsv \
+          tests/expected_output/expected_abundance_summary.tsv
+        rm tests/inputs/testing_abundance_summary.tsv
+      shell: bash
+
+  test_comprehensive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+      - name: test run comp
+        shell: bash -el {0}
+        run: |
+          conda install -c bioconda -c conda-forge -y strainr2
+          conda remove --force -y strainr2
+          make -C src release
+          export PATH="$(pwd)/src/:$PATH"
+          PreProcessR -i tests/genomes/mixture -o tests/StrainR2DB_testing
+          diff <(sort tests/StrainR2DB_testing/KmerContent.report) <(sort tests/expected_output/KmerContent_comprehensive.report)
+          StrainR -1 tests/inputs/mock_reads_testing_R1.fastq.gz \
+            -2 tests/inputs/mock_reads_testing_R2.fastq.gz \
+            -r tests/StrainR2DB_testing -o tests/StrainR2_out_testing -p testing -t 1
+          diff <(sort tests/StrainR2_out_testing/testing.abundances) <(sort tests/expected_output/testing_comprehensive.abundances)
+          diff <(sort tests/StrainR2_out_testing/testing_abundance_summary.tsv) <(sort tests/expected_output/abundance_summary_comprehensive.tsv)

@@ -47,6 +47,7 @@ typedef struct hashtable{
     uint64_t count;
     uint32_t* subcontig_counts;
     uint32_t num_subcontigs;
+    uint32_t curr_subcontig;
     uint32_t kmer_size;
     ht_element_small* items_small; // for use in memory-efficient option
     bool is_small;

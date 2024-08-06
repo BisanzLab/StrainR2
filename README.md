@@ -1,3 +1,6 @@
+[![Testing](https://github.com/kheber/StrainR2_testing/actions/workflows/testing.yml/badge.svg)](https://github.com/kheber/StrainR2_testing/actions/workflows/testing.yml)
+[![StrainR2 Version](https://anaconda.org/bioconda/strainr2/badges/version.svg)](https://anaconda.org/bioconda/strainr2)
+[![Downloads](https://anaconda.org/bioconda/strainr2/badges/downloads.svg)](https://anaconda.org/bioconda/strainr2)
 # Background
 
 Traditional methods for quantifying strain abundances in a microbiome, such as 16S rRNA sequencing, lack the resolution to differentiate strains and are limited to generalizing species. Shotgun metagenomic sequencing offers an alternative, but unnormalized abundances such as FPKM have a bias from similar genomes getting fewer unique mappings. 
@@ -32,11 +35,7 @@ To install the source code into a directory onto your computer, clone the source
 git clone https://github.com/BisanzLab/StrainR2.git
 ```
 
-Dependencies need to be installed according to versions listed at the bottom of this document. A .yml file provided in the git repository can be used to create an environment from scratch. 
-```
-conda env create -f StrainR2/strainr2.yml
-conda activate strainr2
-```
+Dependencies need to be installed according to versions listed at the bottom of this document.
 
 Files can be compiled using make
 ```

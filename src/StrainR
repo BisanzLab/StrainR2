@@ -85,7 +85,7 @@ bbmap.sh\
   ref="$reference"/BBindex/BBIndex.fasta \
   out="$outdir"/"$prefix".sam \
   rpkm="$outdir"/"$prefix".rpkm \
-  threads="$threads" \
+  threads="$threads" deterministic=t averagepairdist=200 \
   -Xmx"$mem"g \
   perfectmode=t local=f ambiguous=toss pairedonly=t nodisk=t
 
