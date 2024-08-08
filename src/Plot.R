@@ -36,7 +36,7 @@ Norm<-
   select(StrainID, ContigID, Start_Stop, Unique_Kmers=Nunique, Length_Contig=Length, Bases, Coverage, Mapped_Reads=Reads, Mapped_Frags=Frags, Total_Mapped_Reads_In_Sample) %>%
   mutate(FUKM=Mapped_Frags/(Unique_Kmers/1e3)/(Total_Mapped_Reads_In_Sample/1e6)) %>%
   group_by(StrainID)%>%
-  filter(Unique_Kmers>=quantile(Unique_Kmers,opt$subcontigfilter/100))%>%
+  filter(Unique_Kmers>=quantile(Unique_Kmers,opt$subcontigfilter/100, na.rm=T))%>%
   ungroup()
 
 write_tsv(Norm, paste0(opt$abundances, "/", opt$prefix,".abundances"))

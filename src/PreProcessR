@@ -48,7 +48,7 @@ fi
 #preprocessr pipeline
 echo "Creating subcontigs"
 mkdir "$outdir"
-ksize=$(("$readsize" * 2 + 1))
+ksize=$(($readsize * 2 + 1))
 
 if ! [ -z "$subcontigsize" ]; then
   subcontigsize="-s $subcontigsize"

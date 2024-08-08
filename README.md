@@ -67,7 +67,7 @@ PreProcessR -i <PATH_TO_GENOME_FILES> [OPTIONS]
 
 The path to a directory containing only the genome files to be quantified. Accepted file formats are .fna and .fasta
 
-**-o or --outidr:**
+**-o or --outdir:**
 
 Path to desired directory for output files to be stored in. Directory does not need to be made before running `PreProcessR`. If the output directory already exists before a run, make sure it is empty. Default is `./StrainR2DB`
 
