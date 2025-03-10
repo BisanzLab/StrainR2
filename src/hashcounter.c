@@ -11,26 +11,27 @@
 
 KSEQ_INIT(gzFile, gzread)
 
-hashtable* hashtable_create(uint32_t kmer_size, bool is_small, uint32_t num_subconts){
-    hashtable* ht = (hashtable*) malloc(sizeof(hashtable));
+hashtable_t* hashtable_create(uint32_t kmer_size, uint32_t num_subconts, uint32_t num_threads){
+    hashtable_t* ht = (hashtable_t*) malloc(sizeof(hashtable_t));
     ht->subcontig_names = calloc(num_subconts,sizeof(char*));
     ht->subcontig_counts = calloc(num_subconts,sizeof(int));
     ht->num_subcontigs = num_subconts;
-    ht->curr_subcontig = 0;
+    ht->curr_subcontig = 1;
     ht->size = INITIAL_HT_SIZE;
     ht->count = 0;
     ht->entry_bitmask = INITIAL_HT_BITMASK;
     ht->kmer_size = kmer_size;
-    ht->is_small = is_small;
-    if(is_small){
-        ht->items_small = (ht_element_small*) calloc(INITIAL_HT_SIZE, sizeof(ht_element_small));
-    }else{
-        ht->items = (ht_element*) calloc(INITIAL_HT_SIZE, sizeof(ht_element));
+    ht->num_threads = num_threads;
+    ht->items = (ht_element_t*) calloc(INITIAL_HT_SIZE, sizeof(ht_element_t));
+    if(ht->items == NULL){
+        exit(0);
     }
+    sem_init(&(ht->can_edit_ht), 0, num_threads);
+    pthread_mutex_init(&ht->resize_lock, NULL);
     return ht;
 }
 
-void hashtable_destroy(hashtable* ht){
+void hashtable_destroy(hashtable_t* ht){
     int i=1;
     while(ht->subcontig_names[i]!=NULL){
         free(ht->subcontig_names[i]);
@@ -38,75 +39,49 @@ void hashtable_destroy(hashtable* ht){
     }
     free(ht->subcontig_names);
     free(ht->subcontig_counts);
-    if(ht->is_small){
-        free(ht->items_small);
-    }else{
-        free(ht->items);
-    }
+    free(ht->items);
+    sem_destroy(&(ht->can_edit_ht));
+    pthread_mutex_destroy(&ht->resize_lock);
     free(ht);
-}
-
-static inline ht_element_status ht_small_get_status(ht_element_small* element){
-    return (element->value & 0xC0000000) >> 30;
-}
-
-static inline void ht_small_set_status(ht_element_small* element, ht_element_status status){
-    element->value &= 0x3FFFFFFF;
-    element->value |= (status << 30);
-}
-
-static inline uint32_t ht_small_get_id(ht_element_small* element){
-    return element->value & 0x3FFFFFFF;
-}
-
-static inline void ht_small_set_id(ht_element_small* element, uint32_t id){
-    element->value &= 0xC0000000;
-    element->value |= id;
 }
 
 // insert into hashtable with linear probe collision policy
 // return entry if found in ht 
-ht_element* hashtable_insert(hashtable* ht, uint64_t key, ht_element_status status, uint32_t subcontig_id){
+ht_element_t* hashtable_insert(hashtable_t* ht, uint64_t key, ht_element_status status, uint32_t subcontig_id){
     uint64_t hash = key & ht->entry_bitmask;
-    ht_element* current_item = &(ht->items[hash]);
-    while(current_item->status != EMPTY){
-        if(current_item->key == key) return current_item;
+    ht_element_t* current_item = &(ht->items[hash]);
+    ht_element_status emp = EMPTY;
+    while(!atomic_compare_exchange_strong(&(current_item->status), &emp, status)){
+        emp = EMPTY;
+        // ensure key isn't 0 to prevent race condition where item is actively being created by another thread
+        volatile uint64_t* curr_key = &(current_item->key);
+        while(*curr_key == 0){}
+        if(*curr_key == key) return current_item;
         ++current_item;
         // reset to beginning of hashtable if end is reached
         if((uint64_t)(current_item - ht->items) == ht->size) current_item = ht->items;
     }
-    current_item->key = key;
-    current_item->status = status;
+    // important to write key after id, as it is assumed a filled in key means a filled in id
     current_item->subcontig_id = subcontig_id;
-    return NULL;
-}
-
-// insert function with same behaviour, but for memory-efficient version
-ht_element_small* hashtable_insert_small(hashtable* ht, uint32_t key, ht_element_status status, uint32_t subcontig_id){
-    uint32_t hash = key & ht->entry_bitmask;
-    ht_element_small* current_item = &(ht->items_small[hash]);
-    while(ht_small_get_status(current_item) != EMPTY){
-        if(current_item->key == key) return current_item;
-        ++current_item;
-        // reset to beginning of hashtable if end is reached
-        if((uint64_t)(current_item - ht->items_small) == ht->size) current_item = ht->items_small;
-    }
     current_item->key = key;
-    ht_small_set_status(current_item, status);
-    ht_small_set_id(current_item, subcontig_id);
     return NULL;
 }
 
 // double ht size and re-enter all elements from left to right
-void hashtable_resize(hashtable* ht){
-    if(ht->is_small){hashtable_resize_small(ht); return;}
+void hashtable_resize(hashtable_t* ht){
+    //uint64_t putative_count = 0;
     ht->size *= 2;
     printf("Hashtable is resizing, new size will use ~ %ld GiB of memory\n", ht->size/INITIAL_HT_SIZE/2);
     uint64_t changed_bit = ht->entry_bitmask;
     ht->entry_bitmask = (ht->entry_bitmask << 1) | 0x1;
     changed_bit ^= ht->entry_bitmask;
-    ht->items = realloc(ht->items, ht->size * sizeof(ht_element));
-    ht_element* current_entry =  ht->items-1;
+    ht->items = realloc(ht->items, ht->size * sizeof(ht_element_t));
+    if (!ht->items) {
+        fprintf(stderr, "Error: not enough space for hashtable to resize. Program exiting.\n");
+        exit(EXIT_FAILURE);
+    }
+    memset(&ht->items[ht->size/2], 0, ht->size/2);
+    ht_element_t* current_entry =  ht->items-1;
     while(current_entry != &ht->items[ht->size/2]){
         ++current_entry;
         if(current_entry->status == EMPTY) continue;
@@ -117,36 +92,8 @@ void hashtable_resize(hashtable* ht){
     }
 }
 
-void hashtable_resize_small(hashtable* ht){
-    /*
-    add warnings and errors for big sizes
-    */
-    ht->size *= 2;
-    printf("Hashtable is resizing, new size will use ~ %.1f GiB of memory\n", (float)ht->size/INITIAL_HT_SIZE/4);
-    if(ht->size == 536870912){ // 2^29
-        printf("Warning: Due to the large input size and use of the memory-efficient mode, the output is losing some accuracy.\n");
-    }
-    if(ht->size == 1073741824){ // 2^30
-        fprintf(stderr,"Error: memory-efficient mode has lost too much accuracy to continue, please try again without it enabled.\n");
-        exit(EXIT_FAILURE);
-    }
-    uint64_t changed_bit = ht->entry_bitmask;
-    ht->entry_bitmask = (ht->entry_bitmask << 1) | 0x1;
-    changed_bit ^= ht->entry_bitmask;
-    ht->items_small = realloc(ht->items_small, ht->size * sizeof(ht_element_small));
-    ht_element_small* current_entry =  ht->items_small-1;
-    while(current_entry != &ht->items_small[ht->size/2]){
-        ++current_entry;
-        if(ht_small_get_status(current_entry) == EMPTY) continue;
-        if(hashtable_insert_small(ht, current_entry->key, ht_small_get_status(current_entry), ht_small_get_id(current_entry))!=NULL) continue;
-        current_entry->key = 0;
-        ht_small_set_status(current_entry, EMPTY);
-        ht_small_set_id(current_entry, 0);
-    }
-}
-
 // return the sum of all unique hashes
-uint64_t sum_unique_hahses(hashtable* ht){
+uint64_t sum_unique_hahses(hashtable_t* ht){
     uint64_t sum = 0;
     for(uint32_t i=0; i<ht->num_subcontigs; ++i){
         sum+=ht->subcontig_counts[i];
@@ -155,40 +102,23 @@ uint64_t sum_unique_hahses(hashtable* ht){
 }
 
 // add one k-mer (to be hashed) to the hashtable
-static inline void hashtable_add_kmer(hashtable* ht, char* seq, uint32_t subcontig_id){
+static inline void hashtable_add_kmer(hashtable_t* ht, char* seq, uint32_t subcont_id, int32_t* uniq_count, uint64_t* count){
     uint64_t hash = MurmurHash64A(seq, ht->kmer_size, (uint64_t)07062024);
-    ht_element* hashtable_item = hashtable_insert(ht, hash, UNIQUE, subcontig_id);
+    ht_element_t* hashtable_item = hashtable_insert(ht, hash, UNIQUE, subcont_id);
+    ht_element_status uniq = UNIQUE;
     if(hashtable_item == NULL){
-        ++ht->subcontig_counts[subcontig_id];
-        ++ht->count;
-    } else if(hashtable_item->status == UNIQUE){
-        hashtable_item->status = NON_UNIQUE;
-        --ht->subcontig_counts[hashtable_item->subcontig_id];
+        ++uniq_count[subcont_id];
+        ++*count;
+    } else if(atomic_compare_exchange_strong(&(hashtable_item->status), &uniq, NON_UNIQUE)){
+        --uniq_count[hashtable_item->subcontig_id];
     }
 }
 
-// same functionality but for memory-efficient mode
-static inline void hashtable_small_add_kmer(hashtable* ht, char* seq, uint32_t subcontig_id){
-    uint32_t hash = MurmurHash3_x86_32(seq, ht->kmer_size, (uint32_t)07062024);
-    ht_element_small* hashtable_item = hashtable_insert_small(ht, hash, UNIQUE, subcontig_id);
-    if(hashtable_item == NULL){
-        ++ht->subcontig_counts[subcontig_id];
-        ++ht->count;
-    } else if(ht_small_get_status(hashtable_item) == UNIQUE){
-        ht_small_set_status(hashtable_item, NON_UNIQUE);
-        --ht->subcontig_counts[ht_small_get_id(hashtable_item)];
-    }
-}
 
 // function for marking a k-mer as non-unique
-static inline void hashtable_mark_kmer(hashtable* ht, char* seq, uint32_t subcont_id){
+static inline void hashtable_mark_kmer(hashtable_t* ht, char* seq, uint32_t subcont_id, int32_t* uniq_count, uint64_t* count){
     uint64_t hash = MurmurHash64A(seq, ht->kmer_size, (uint64_t)07062024);
-    if(hashtable_insert(ht, hash, NON_UNIQUE, subcont_id)==NULL) ++ht->count;
-}
-
-static inline void hashtable_small_mark_kmer(hashtable* ht, char* seq, uint32_t subcont_id){
-    uint32_t hash = MurmurHash3_x86_32(seq, ht->kmer_size, (uint32_t)07062024);
-    if(hashtable_insert_small(ht, hash, NON_UNIQUE, subcont_id)==NULL) ++ht->count;
+    if(hashtable_insert(ht, hash, NON_UNIQUE, subcont_id)==NULL) ++*count;
 }
 
 /* following function adapted from Austin Appleby */
@@ -227,45 +157,6 @@ uint64_t MurmurHash64A (const void* key, int len, uint64_t seed){
     return h;
 }
 
-/* following function adapted from Austin Appleby */
-uint32_t MurmurHash3_x86_32(const void* key, int len, uint32_t seed){
-    const uint8_t* data = (const uint8_t*)key;
-    const int nblocks = len / 4;
-    uint32_t h1 = seed;
-    const uint32_t c1 = 0xcc9e2d51;
-    const uint32_t c2 = 0x1b873593;
-
-    const uint32_t* blocks = (const uint32_t*)(data + nblocks*4);
-    for(int i = -nblocks; i; ++i){
-        uint32_t k1 = blocks[i];
-
-        k1 *= c1;
-        k1 = (k1 << 15) | (k1 >> 17);
-        k1 *= c2;
-
-        h1 ^= k1;
-        h1 = (h1 << 13) | (h1 >> 19); 
-        h1 = h1*5+0xe6546b64;
-    }
-
-    const uint8_t* tail = (const uint8_t*)(data + nblocks*4);
-    uint32_t k1 = 0;
-    switch(len & 3){
-    case 3: k1 ^= tail[2] << 16; break;
-    case 2: k1 ^= tail[1] << 8; break;
-    case 1: k1 ^= tail[0]; break;
-            k1 *= c1; k1 = (k1 << 15) | (k1 >> 17); k1 *= c2; h1 ^= k1;
-    };
-
-    h1 ^= len;
-    h1 ^= h1 >> 16;
-    h1 *= 0x85ebca6b;
-    h1 ^= h1 >> 13;
-    h1 *= 0xc2b2ae35;
-    h1 ^= h1 >> 16;
-    return h1;
-} 
-
 // following lookup basemap for use in reverse complementing
 static const unsigned char basemap[256] = {
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,
@@ -303,15 +194,80 @@ static inline int check_n(char* seq, uint32_t kmer_size){
     return 0;
 }
 
+// return kseq to subcontig sequence given directory and file name
+// caller is responsible for destroying kseq
+kseq_t* open_subcontig(hashtable_t* ht, char* dir_location, char* subcont_name, uint32_t subcont_id){
+    kseq_t* seq;
+    char* subcont_location;
+    uint32_t loc_size = strlen(dir_location)+strlen(subcont_name)+1;
+    subcont_location = calloc(loc_size, sizeof(char));
+    strcpy(subcont_location, dir_location);
+    subcont_location = strcat(subcont_location, subcont_name);
+    gzFile fp = gzopen(subcont_location,"r");
+    if(fp == NULL){
+        fprintf(stderr, "Error opening %s\n", subcont_name);
+        exit(EXIT_FAILURE);
+    }
+    seq = kseq_init(fp);
+    kseq_read(seq);
+    gzclose(fp);
+    return(seq);
+}
+
+// threads start here via pthread_create
+void* start_hash_thread(void* input){
+    job_queue_t* job_queue = (job_queue_t*) input;
+    hashtable_t* original_ht = job_queue->job_head->ht;
+    if(!original_ht) return NULL;
+    // counts shall be specific to this thread until the end where they are atomically combined
+    int32_t* thread_subcontig_counts = calloc(job_queue->job_head->ht->num_subcontigs, sizeof(int32_t));
+    // job queue is shared between all threads and must be thread safe
+    pthread_mutex_lock(&job_queue->job_queue_lock);
+    while(job_queue->job_head->ht != NULL){
+        hash_job_t* curr_job = job_queue->job_head;
+        curr_job->local_uniq_counts = thread_subcontig_counts;
+        ++job_queue->job_head;
+        pthread_mutex_unlock(&job_queue->job_queue_lock);
+        hash_and_insert_subcontig(curr_job);
+        pthread_mutex_lock(&job_queue->job_queue_lock);
+    }
+    pthread_mutex_unlock(&job_queue->job_queue_lock);
+    // update unique counts
+    _Atomic int32_t* uniq_counts = original_ht->subcontig_counts;
+    for(int i = 0; i < original_ht->num_subcontigs; ++i){
+        uniq_counts[i] += thread_subcontig_counts[i];
+    }
+    free(thread_subcontig_counts);
+    return NULL;
+}
+
 // add k-mers to the hashtable for an entire subcontig
-void hash_and_insert_subcontig(hashtable* ht, char* seq, uint32_t subcontig_id, void (*kmer_func)(hashtable*, char*, uint32_t)){
+void hash_and_insert_subcontig(hash_job_t* hash_job){
     uint32_t i = 0;
+    hashtable_t* ht = hash_job->ht;
+    kseq_t* kseq = open_subcontig(hash_job->ht, hash_job->dir_location, hash_job->subcontig_loc, hash_job->subcontig_id);
+    char* subcont_header;
+    // comments are technically anything after a semicolon, but will be included as part of subcont_header
+    if(kseq->comment.s != NULL){
+        subcont_header = calloc(strlen(kseq->name.s)+strlen(kseq->comment.s)+2, sizeof(char));
+        memcpy(subcont_header, kseq->name.s, strlen(kseq->name.s));
+        subcont_header[strlen(kseq->name.s)] = ' ';
+        strcat(subcont_header, kseq->comment.s);
+    } else {
+        subcont_header = calloc(strlen(kseq->name.s)+1, sizeof(char));
+        memcpy(subcont_header, kseq->name.s, strlen(kseq->name.s));
+    }
+    ht->subcontig_names[hash_job->subcontig_id] = subcont_header;
+
+    char* seq = kseq->seq.s;
     char* rc = reverse_complement(seq);
     uint32_t n;
     uint32_t seq_len = strlen(seq);
+    uint64_t local_counts = 0;
     while((n=check_n(&seq[i], ht->kmer_size))){
         i+=n;
     }
+    sem_wait(&(ht->can_edit_ht));
     while(ht->kmer_size + i <= seq_len){
         if(seq[i+ht->kmer_size-1]=='N'){
             i+=ht->kmer_size;
@@ -320,59 +276,80 @@ void hash_and_insert_subcontig(hashtable* ht, char* seq, uint32_t subcontig_id, 
             continue;
         }
     
+        // only add canonical k-mers
         if(strncmp(&seq[i], &rc[seq_len-ht->kmer_size-i], ht->kmer_size) < 0){
-            kmer_func(ht, &seq[i], subcontig_id);
+            hash_job->kmer_func(ht, &seq[i], hash_job->subcontig_id, hash_job->local_uniq_counts, &local_counts);
         }else{
-            kmer_func(ht, &rc[seq_len-ht->kmer_size-i], subcontig_id);
+            hash_job->kmer_func(ht, &rc[seq_len-ht->kmer_size-i], hash_job->subcontig_id, hash_job->local_uniq_counts, &local_counts);
         }
-        
         ++i;
     }
+    ht->count += local_counts;
+    sem_post(&(ht->can_edit_ht));
+    kseq_destroy(kseq);
     free(rc);
+
     // resize hashtable if load factor is >0.75 after subcontig addition
-    if((float) ht->count / ht->size > 0.75) hashtable_resize(ht);
+    pthread_mutex_lock(&ht->resize_lock);
+    if((float) ht->count / ht->size > 0.75){
+        for(int j = 0; j < ht->num_threads; ++j){
+            sem_wait(&(ht->can_edit_ht));
+        }
+        /*
+         * could multithread the below func
+         */
+        hashtable_resize(ht);
+
+        for(int j = 0; j < ht->num_threads; ++j){
+            sem_post(&(ht->can_edit_ht));
+        }
+    }
+    pthread_mutex_unlock(&ht->resize_lock);
 }
 
 // add k-mers to the hashtable for all subcontigs in a directory
-void hash_and_insert(hashtable* ht, char* dir_location, void (*kmer_func)(hashtable*, char*, uint32_t)){
-    kseq_t* seq;
+void hash_and_insert(hashtable_t* ht, char* dir_location, kmer_func_t kmer_func){
     struct dirent *de;
     DIR *dr = opendir(dir_location);
+    job_queue_t* job_queue = malloc(sizeof(job_queue_t));
+    job_queue->job_head = calloc(ht->num_subcontigs+1, sizeof(hash_job_t));
+    pthread_mutex_init(&job_queue->job_queue_lock, NULL);
+    uint32_t queue_start = ht->curr_subcontig;
+    hash_job_t* original_job_head = job_queue->job_head;
+
     if(dr == NULL) {
         fprintf(stderr, "Could not open subcontigs directory\n\n");
         exit(EXIT_FAILURE);
     }
-    char* subcont_location;
-    char* subcont_name;
     while (((de = readdir(dr)) != NULL)) {
         if(!(strlen(de->d_name) >= 10 && strcmp(&de->d_name[strlen(de->d_name) - 10], ".subcontig") == 0)) continue;
-        uint32_t loc_size = strlen(dir_location)+strlen(de->d_name)+1;
-        subcont_location = calloc(loc_size, sizeof(char));
-        strcpy(subcont_location, dir_location);
-        subcont_location = strcat(subcont_location, de->d_name);
-        gzFile fp = gzopen(subcont_location,"r");
-        if(fp == NULL){
-            fprintf(stderr, "Error opening %s\n", de->d_name);
-            exit(EXIT_FAILURE);
-        }
-        seq = kseq_init(fp);
-        kseq_read(seq);
-        if(seq->comment.s != NULL){
-            subcont_name = calloc(strlen(seq->name.s)+strlen(seq->comment.s)+2, sizeof(char));
-            memcpy(subcont_name, seq->name.s, strlen(seq->name.s));
-            subcont_name[strlen(seq->name.s)] = ' ';
-            strcat(subcont_name, seq->comment.s);
-        } else {
-            subcont_name = calloc(strlen(seq->name.s)+1, sizeof(char));
-            memcpy(subcont_name, seq->name.s, strlen(seq->name.s));
-        }
-        ht->subcontig_names[ht->curr_subcontig] = subcont_name;
-        hash_and_insert_subcontig(ht, seq->seq.s, ht->curr_subcontig, kmer_func);
+        job_queue->job_head[ht->curr_subcontig].ht = ht;
+        job_queue->job_head[ht->curr_subcontig].dir_location = dir_location;
+        job_queue->job_head[ht->curr_subcontig].subcontig_loc = calloc(strlen(de->d_name)+1, sizeof(char));
+        memcpy(job_queue->job_head[ht->curr_subcontig].subcontig_loc, de->d_name, strlen(de->d_name));
+        job_queue->job_head[ht->curr_subcontig].subcontig_id = ht->curr_subcontig;
+        job_queue->job_head[ht->curr_subcontig].kmer_func = kmer_func;
         ++ht->curr_subcontig;
-        free(subcont_location);
-        gzclose(fp);
-        kseq_destroy(seq);
     }
+    
+    job_queue->job_head += queue_start;
+    // start threads
+    pthread_t* tids = calloc(ht->num_threads, sizeof(pthread_t));
+    pthread_mutex_lock(&job_queue->job_queue_lock);
+    for(int i = 0; i < ht->num_threads; ++i){
+        pthread_create(&tids[i], NULL, start_hash_thread, job_queue);
+    }
+    pthread_mutex_unlock(&job_queue->job_queue_lock);
+
+    // wait for all threads to finish
+    for(int i = 0; i < ht->num_threads; ++i){
+        pthread_join(tids[i], NULL);
+    }
+
+    pthread_mutex_destroy(&job_queue->job_queue_lock);
+    free(original_job_head);
+    free(job_queue);
+    free(tids);
     closedir(dr);
 }
 
@@ -382,11 +359,11 @@ int main(int argc, char **argv){
     char* exc_subcontigs = NULL;
     char* outdir = NULL;
     uint32_t kmer_size = 0;
-    bool is_mem_efficient = false;
     uint32_t num_subcontigs = 0;
+    uint32_t num_threads = 8;
 
     // parse options
-    while ((opt = getopt(argc, argv, "s:e:k:n:o:h")) != -1) {
+    while ((opt = getopt(argc, argv, "s:e:k:n:o:t:h")) != -1) {
         switch (opt) {
             case 's': {
                 subcontigs = calloc(strlen(optarg) + 2, sizeof(char));
@@ -404,14 +381,14 @@ int main(int argc, char **argv){
             case 'n': {
                 num_subcontigs = atoi(optarg);
             } break;
+            case 't': {
+                num_threads = atoi(optarg);
+            } break;
             case 'o': {
                 outdir = calloc(strlen(optarg) + strlen("/KmerContent.report") + 1, sizeof(char));
                 strcpy(outdir, optarg);
                 strcat(outdir, "/KmerContent.report");
             } break;
-            /*case 'm': {
-                is_mem_efficient = true;
-            } break;*/
             case 'h': {
                 printf(USAGE);
                 return EXIT_SUCCESS;
@@ -429,25 +406,15 @@ int main(int argc, char **argv){
         return EXIT_FAILURE;
     }
 
-    if(is_mem_efficient){
-        printf("Memory-efficient mode has been enabled. Note that this comes with reduced accuracy when there are larger input sizes.\n");
-    }
-
     printf("Hashing and counting k-mers\n");
-    hashtable* ht = hashtable_create(kmer_size, is_mem_efficient, num_subcontigs+1);
+    hashtable_t* ht = hashtable_create(kmer_size, num_subcontigs+1, num_threads);
 
     // main pipeline
-    if(is_mem_efficient){
-        printf("Hashing excluded subcontigs and marking them as non-unique\n");
-        hash_and_insert(ht, exc_subcontigs, hashtable_small_mark_kmer);
-        printf("Hashing subcontigs and finding unique k-mers\n");
-        hash_and_insert(ht, subcontigs, hashtable_small_add_kmer);
-    }else{
-        printf("Hashing excluded subcontigs and marking them as non-unique\n");
-        hash_and_insert(ht, exc_subcontigs, hashtable_mark_kmer);
-        printf("Hashing subcontigs and finding unique k-mers\n");
-        hash_and_insert(ht, subcontigs, hashtable_add_kmer);
-    }
+    
+    printf("Hashing excluded subcontigs and marking them as non-unique\n");
+    hash_and_insert(ht, exc_subcontigs, hashtable_mark_kmer);
+    printf("Hashing subcontigs and finding unique k-mers\n");
+    hash_and_insert(ht, subcontigs, hashtable_add_kmer);
 
     printf("A total of %ld different k-mers were found\n%ld k-mers were unique\n",ht->count, sum_unique_hahses(ht));
 
@@ -460,7 +427,7 @@ int main(int argc, char **argv){
         return EXIT_FAILURE;
     }
     fprintf(kmercontent,"SubcontigID\tStrainID\tContigID\tStart_Stop\tLength\tNunique\n");
-    uint32_t i=0;
+    uint32_t i=1;
     while(ht->subcontig_names[i]!=NULL){
         fprintf(kmercontent,"%s\t", ht->subcontig_names[i]);
         subcontig_info = strtok(ht->subcontig_names[i], ";");

@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -g -I./
 CFLAGS += -Wall -Werror -Wno-unused-function -Wno-unused-parameter -Wcast-align
 CFLAGS += -Wshadow -Wpointer-arith -Wwrite-strings -Wunreachable-code -pedantic
-LDFLAGS = -lz
+LDFLAGS = -lz -lpthread
 OBJS = hashcounter.o subcontig.o
 
 all: subcontig hashcounter
@@ -10,7 +10,7 @@ all: subcontig hashcounter
 release: CFLAGS += -O3 # release flags
 release: clean all
 
-debug: CFLAGS += -O0 -fsanitize=address # debug flags
+debug: CFLAGS += -O0 # -fsanitize=address # debug flags
 debug: clean all
 
 subcontig: subcontig.o
