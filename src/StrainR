@@ -27,6 +27,8 @@ for argument in $options
       -s | --subcontigfilter) subcontig_filter="${arguments[i]}" ;;
       -t | --threads) threads="${arguments[i]}" ;;
       -m | --mem) mem="${arguments[i]}" ;;
+      -b1 | --background1) background1="${arguments[i]}" ;;
+      -b2 | --background2) background2="${arguments[i]}" ;;
       -o | --outdir) outdir="${arguments[i]}" ;;
       -p | --prefix) prefix="${arguments[i]}" ;;
       -h | --help) 
@@ -39,6 +41,8 @@ StrainR normalizes mapping from reads using the output from PreProcessR\n\
 \tOptional Arguments:\n\
 \t\t-c/--weightedpercentile number\t: Weighted percentile for a strain's FUKMs to use in abundance estimation [Default = 60]\n\
 \t\t-s/--subcontigfilter number\t: Percentage of a strain's subcontigs that should be filtered out based on number of unique k-mers [Default = 0]\n\
+\t\t-b1/--background1 path/to/background1.fq.gz\t: path to forward background reads for exclusion. This is not necessary in a typical use case. [Default = None]\n\
+\t\t-b2/--background2 path/to/background2.fq.gz\t: path to reverse background reads for exclusion. This is not necessary in a typical use case. [Default = None]\n\
 \t\t-o/--outdir path/to/out\t\t: path to your output directory to contain normalized abundances [Default = current directory]\n\
 \t\t-p/--prefix string\t\t: Name of community (used in output files) [Default = "sample"]\n\
 \t\t-t/--threads number\t\t: number of threads to use when running fastp, bbmap, and samtools. Maximum is 16 [Default = 8]\n\
@@ -83,7 +87,7 @@ echo Mapping Reads
 bbmap.sh\
   in="$outdir"/tmp/forward.fastq.gz in2="$outdir"/tmp/reverse.fastq.gz \
   ref="$reference"/BBindex/BBIndex.fasta \
-  out="$outdir"/"$prefix".sam \
+  outm="$outdir"/"$prefix".sam \
   rpkm="$outdir"/"$prefix".rpkm \
   threads="$threads" deterministic=t averagepairdist=200 \
   -Xmx"$mem"g \
@@ -92,6 +96,65 @@ bbmap.sh\
 samtools view --threads "$threads" -bS "$outdir"/"$prefix".sam | \
 samtools sort --threads "$threads" -o "$outdir"/"$prefix".bam
 
+# background subtraction if background provided
+if [ ! -z "$background1" ] && [ ! -z "$background2" ]; then
+  #trim background reads
+  echo Trimming Background Reads
+  fastp -i "$background1" -o "$outdir"/tmp/bg_forward.fastq.gz \
+    -I "$background2" -O "$outdir"/tmp/bg_reverse.fastq.gz \
+    --trim_poly_g --json "$outdir" --html "$outdir" \
+    --length_required 50 --n_base_limit 0 \
+    --thread "$threads"
+
+  #map background reads
+  echo Mapping Background Reads
+  bbmap.sh\
+    in="$outdir"/tmp/bg_forward.fastq.gz in2="$outdir"/tmp/bg_reverse.fastq.gz \
+    ref="$reference"/BBindex/BBIndex.fasta \
+    outm="$outdir"/"$prefix"_bg.sam \
+    rpkm="$outdir"/"$prefix"_bg.rpkm \
+    threads="$threads" deterministic=t averagepairdist=200 \
+    -Xmx"$mem"g \
+    perfectmode=t local=f ambiguous=toss pairedonly=t nodisk=t
+  
+  rm "$outdir"/"$prefix"_bg.rpkm
+
+  samtools view --threads "$threads" -bS "$outdir"/"$prefix"_bg.sam | \
+  samtools sort --threads "$threads" -o "$outdir"/"$prefix"_bg.bam
+
+  echo Filtering Background Reads from Sample Reads
+  samtools view -H "$outdir"/"$prefix".bam | grep '^@SQ' | sed -E 's/@SQ\tSN://;s/\tLN:/\t/' > "$outdir"/genome_file.txt
+
+  bedtools subtract -s -sorted -A -f 0.97 \
+    -g "$outdir"/genome_file.txt \
+    -a "$outdir"/"$prefix".bam \
+    -b "$outdir"/"$prefix"_bg.bam \
+    > "$outdir"/"$prefix"_filtered.bam
+
+  samtools sort --threads "$threads" -n "$outdir"/"$prefix"_filtered.bam \
+    -o "$outdir"/"$prefix"_filtered_sorted.bam
+  
+  rm "$prefix"_filtered.bam
+
+  samtools fastq -1 "$outdir"/"$prefix"_filtered_1.fq \
+    -2 "$outdir"/"$prefix"_filtered_2.fq \
+    -0 /dev/null -s /dev/null -n --threads "$threads" \
+    "$outdir"/"$prefix"_filtered_sorted.bam
+
+  bbmap.sh \
+    in="$outdir"/"$prefix"_filtered_1.fq \
+    in2="$outdir"/"$prefix"_filtered_2.fq \
+    ref="$reference"/BBindex/BBIndex.fasta \
+    outm="$outdir"/filtered_"$prefix"_remap.sam \
+    rpkm="$outdir"/filtered_"$prefix"_remap.rpkm \
+    threads="$threads" deterministic=t averagepairdist=200 \
+    -Xmx"$mem"g perfectmode=t local=f ambiguous=toss pairedonly=t nodisk=t
+
+  rm "$outdir"/"$prefix"_filtered_1.fq
+  rm "$outdir"/"$prefix"_filtered_2.fq
+  rm "$outdir"/"$prefix"_filtered_sorted.bam
+  rm "$outdir"/filtered_"$prefix"_remap.sam
+fi
 
 rm "$outdir"/"$prefix".sam
 rm -r "$outdir"/tmp

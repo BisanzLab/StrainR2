@@ -119,6 +119,14 @@ The weighted percentile of a strain's subcontig's FUKMs to be used for final abu
 
 The percentage of subcontigs that should get filtered out on the basis of having too few unique k-mers. Default = 0
 
+**-b1 or --background1:**
+
+path to forward background reads that will be excluded from analysis. This should not be used in the typical use case of synthetic communities. This option is for filtering out background reads of an undefined community. (reads do not have to be in .gz)
+
+**-b2 or --background2:**
+
+path to forward background reads that will be excluded from analysis. This should not be used in the typical use case of synthetic communities. This option is for filtering out background reads of an undefined community. (reads do not have to be in .gz)
+
 **-o or --outdir:**
 
 Path to your output directory to contain normalized abundances. Default = current directory
@@ -188,6 +196,7 @@ In addition, `StrainR` provides a plot for FUKM abundances. Weighted percentile 
  * fastp
  * GNU make (if compiling from source)
  * samtools
+ * bedtools
  * R
  * R optparse
  * R tidyverse
