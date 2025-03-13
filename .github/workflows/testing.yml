@@ -44,7 +44,7 @@ jobs:
       - name: test run comp
         shell: bash -el {0}
         run: |
-          conda install -c bioconda -c conda-forge -y strainr2
+          conda install -c bioconda -c conda-forge -y strainr2 bedtools
           conda remove --force -y strainr2
           make -C src release
           export PATH="$(pwd)/src/:$PATH"
@@ -55,3 +55,10 @@ jobs:
             -r tests/StrainR2DB_testing -o tests/StrainR2_out_testing -p testing -t 1
           diff <(sort tests/StrainR2_out_testing/testing.abundances) <(sort tests/expected_output/testing_comprehensive.abundances)
           diff <(sort tests/StrainR2_out_testing/testing_abundance_summary.tsv) <(sort tests/expected_output/abundance_summary_comprehensive.tsv)
+          StrainR -1 tests/inputs/mock_reads_testing_R1.fastq.gz \
+            -2 tests/inputs/mock_reads_testing_R2.fastq.gz \
+            -b1 tests/background/background_1.fq -b2 tests/background/background_2.fq \
+            -r tests/StrainR2DB_testing -o tests/StrainR2_out_testing_bg -p testing_bg -t 1
+          diff <(sort tests/StrainR2_out_testing_bg/testing_bg.abundances) <(sort tests/background/expected_output/testing_bg.abundances)
+          diff <(sort tests/StrainR2_out_testing_bg/testing_bg_abundance_summary.tsv) <(sort tests/background/expected_output/testing_bg_abundance_summary.tsv)
+          
