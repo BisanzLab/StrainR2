@@ -186,6 +186,38 @@ In addition, `StrainR` provides a plot for FUKM abundances. Weighted percentile 
 
 <p>&nbsp;</p>
 
+# Demo
+
+Here will do a minimal demonstration using unit test data with the 8 reference genomes provided in tests/genomes/multiple_complete and the mock reads available in tests/inputs/. Genomes were downloaded and placed into the directory called genomes.
+
+```
+PreProcessR --indir genomes/ --outdir database --readsize 150
+
+StrainR \
+ --forward mock_reads_testing_R1.fastq.gz \
+ --reverse mock_reads_testing_R2.fastq.gz \
+ --reference database/ \
+ --prefix testrun \
+ --outdir strain2_output
+```
+If we examine the resulting file output directory we can find the abundance summary in strainr2_output/testrun_abundance_summary.tsv:
+
+```
+StrainID	weighted_percentile_FUKM	median_FUKM	sd_FUKM	subcontigs_detected	subcontigs_total	percent_detected	percent_abundance
+JEB00015	15.002476052670442	14.949939922104155	0.46622826476923757	38	38	100	13.524840656749035
+JEB00022	14.885728923252971	14.865410790723015	0.6712969280564985	52	52	100	13.41959227528449
+JEB00024	15.005580606237396	14.972944694458326	0.9742879632461824	42	42	100	13.527639434241228
+JEB00030	15.034270854543474	14.829354067500985	0.5823678254771962	28	28	100	13.553503900571984
+JEB00031	15.124317636874952	15.107007945963842	0.6698836185646367	30	30	100	13.634681726046297
+JEB00036	15.088684933746867	14.775182972247737	1.7746910771776707	48	48	100	13.602558586486888
+JEB00041	14.71064817309631	14.689071798986676	0.6518258370527644	26	26	100	13.261755712865087
+JEB00052	6.073637031925493	5.977622518629116	0.27601498880837394	50	50	100	5.4754277077549895
+``` 
+We can also view a visualization of the results in testrun.pdf which summarizes the abundances. In this particular testing data, most strains are present at similar abundances with the exception of JEB00052 which is underrepresented. 
+
+![image](https://github.com/user-attachments/assets/972d1c77-ee42-4626-8316-bc8b8cdd7b7e)
+
+
 # Dependencies
 
  * BBMap
