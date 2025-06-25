@@ -459,16 +459,18 @@ int main(int argc, char **argv){
         fprintf(stderr, "Error: failed to open the specified output directory, exiting\n");
         return EXIT_FAILURE;
     }
-    fprintf(kmercontent,"SubcontigID\tStrainID\tContigID\tStart_Stop\tLength\tNunique\n");
+    fprintf(kmercontent,"SubcontigID\tStrainID\tContigID\tStart_Stop\tLength\tNunique\tPercent_Unique\n");
     uint32_t i=0;
+    int curr_subcont_len = 0;
     while(ht->subcontig_names[i]!=NULL){
         fprintf(kmercontent,"%s\t", ht->subcontig_names[i]);
         subcontig_info = strtok(ht->subcontig_names[i], ";");
         for(int j=0; j<4; ++j){
             fprintf(kmercontent,"%s\t", subcontig_info);
+            if (j==3) curr_subcont_len = atoi(subcontig_info);
             subcontig_info = strtok(NULL, ";");
         }
-        fprintf(kmercontent,"%d\n", ht->subcontig_counts[i]);
+        fprintf(kmercontent,"%d\t%f\n", ht->subcontig_counts[i], ((double)ht->subcontig_counts[i])/(curr_subcont_len-ht->kmer_size+1)*100);
         ++i;
     }
 

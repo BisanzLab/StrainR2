@@ -3,11 +3,11 @@
 [![Downloads](https://anaconda.org/bioconda/strainr2/badges/downloads.svg)](https://anaconda.org/bioconda/strainr2)
 # Background
 
-Traditional methods for quantifying strain abundances in a microbiome, such as 16S rRNA sequencing, lack the resolution to differentiate strains and are limited to generalizing species. Shotgun metagenomic sequencing offers an alternative, but unnormalized abundances such as FPKM have a bias from similar genomes getting fewer unique mappings. 
+Traditional methods for quantifying strain abundances in a synthetic microbiome, such as 16S rRNA sequencing, lack the resolution to differentiate strains and are limited to generalizing species. Shotgun metagenomic sequencing offers an alternative, but unnormalized abundances such as FPKM have a strong bias towards more unique genomes, as they get more unique mappings. 
 
-Other metagenomic methods developed to remove this bias, such as NinjaMap or StrainR1, are inaccurate and scale poorly to larger communities. Abundances are off by magnitudes especially when strains have low coverage, and computational resources scale poorly.
+Other metagenomic methods developed to remove this bias, such as StrainScan, NinjaMap, or StrainR1, are inaccurate, scale poorly to larger communities, or do not handle highly similar strains very well. Abundances are off by magnitudes especially when strains have low coverage, and computational resources scale poorly.
 
-StrainR2 is a solution that quantifies strain abundances using shotgun metagenomic sequencing to within a couple of percent of the true value in a fraction of the time that traditional methods use. 
+StrainR2 is a solution that quantifies strain abundances using shotgun metagenomic sequencing to a similar accuracy as qPCR and in a fraction of the time that traditional methods use. 
 
 
 # Installation
@@ -43,7 +43,7 @@ cd StrainR2/src
 make release
 ```
 
-Note that if StrainR2 is installed from source, code needs to be run by referencing the appropriate files in the `src` directory directly.
+Note that if StrainR2 is installed from source, code needs to be run by referencing the appropriate files in the `src` directory directly. You may also add the `src` directory to your path temporarily using `export PATH="path/to/src/:$PATH"`
 
 <p>&nbsp;</p>
 
@@ -81,13 +81,17 @@ This option overrides the default usage of the minimum N50 build quality statist
 
 **-r or --readsize:**
 
-The size of one end of your paired end reads. 150 by default. To be used to calculate a k-mer size.
+The size of one of your reads. For example, if using 150bp paired end reads, the input should be 150. It is 150 by default. This is to be used to calculate a k-mer size.
+
+**-m or --singleend:**
+
+Enable this flag if the reads that you will input in the `StrainR` step will be single end reads. This flag is disabled by default.
 
 <p>&nbsp;</p>
 
 
 ### StrainR
-`StrainR` takes paired end reads and normalizes the abundance of strains using the output prepared in the `PreProcessR` step. It will generate a .sam, .rpkm, and .abundance file. The .sam and .rpkm files are generated using `BBMap` and the .abundance file normalizes .rpkm output by the data in the previously generated KmerContent.report file. In addition, `StrainR` will generate a plot of abundance.
+`StrainR` takes reads and normalizes the abundance of strains using the output prepared in the `PreProcessR` step. It will generate a .sam, .rpkm, and .abundance file. The .sam and .rpkm files are generated using `BBMap` and the .abundance file normalizes .rpkm output by the data in the previously generated KmerContent.report file. In addition, `StrainR` will generate a plot of abundance.
 
 The `StrainR` command can be invoked from the command line as follows:
 ```
@@ -99,7 +103,7 @@ StrainR -1 <PATH_TO_FORWARD_READS> -2 <PATH_TO_REVERSE_READS> -r <PATH_TO_OUTPUT
 
 Path to forward reads (reads do not have to be in .gz)
 
-**-2 or --reverse [REQUIRED]:**
+**-2 or --reverse:**
 
 Path to reverse reads (reads do not have to be in .gz)
 
@@ -157,20 +161,24 @@ Length: Number of basepairs in subcontig
 
 Nunique: Number of unique k-mers in subcontig
 
+Percent_Unique: The percentage of k-mers that are unique in the subcontig
+
 
 ### The .abundance file is formatted into the following columns:
 
-StrainID, ContigID, Start_Stop, Unique_Kmers, Length_Contig: Same as KmerContent.report file
+StrainID, ContigID, Start_Stop, Unique_Kmers, Length_Contig, Percent_Unique: Same as KmerContent.report file
 
 Bases, Coverage, Mapped_Reads, Mapped_Frags, Total_Mapped_Reads_In_Sample: Outputs from `BBMap` in .rpkm file
 
-FUKM: StrainR2-calculated strain abundance
+FUKM: StrainR2-calculated strain abundance. Note that this metric can not be compared between different synthetic communities.
 
 ### The abundance_summary.tsv file is formatted into the following columns:
 
 StrainID: Name of the fasta file for which summary statistics will be provided.
 
 weighted_percentile_FUKM, median_FUKM, sd_FUKM: Weighted percentile (per `StrainR`'s `-c` option), median, and standard deviation of all subcontig FUKMs in the strain
+
+percent_unique: The percentage of k-mers that are unique in the strain relative to itself and the rest of the community. 
 
 subcontigs_detected: The number of subcontigs that had an FUKM>0
 
@@ -188,30 +196,30 @@ In addition, `StrainR` provides a plot for FUKM abundances. Weighted percentile 
 
 # Demo
 
-Here will do a minimal demonstration using unit test data with the 8 reference genomes provided in tests/genomes/multiple_complete and the mock reads available in tests/inputs/. Genomes were downloaded and placed into the directory called genomes.
+Here we will do a minimal demonstration using unit test data with the 8 reference genomes provided in `tests/genomes/multiple_complete` and the mock reads available in `tests/inputs/`.
 
 ```
-PreProcessR --indir genomes/ --outdir database --readsize 150
+PreProcessR --indir tests/genomes/multiple_complete --outdir database --readsize 150
 
 StrainR \
- --forward mock_reads_testing_R1.fastq.gz \
- --reverse mock_reads_testing_R2.fastq.gz \
+ --forward tests/inputs/mock_reads_testing_R1.fastq.gz \
+ --reverse tests/inputs/mock_reads_testing_R2.fastq.gz \
  --reference database/ \
  --prefix testrun \
  --outdir strain2_output
 ```
-If we examine the resulting file output directory we can find the abundance summary in strainr2_output/testrun_abundance_summary.tsv:
+If we examine the resulting output directory, we can find the abundance summary in `strainr2_output/testrun_abundance_summary.tsv`:
 
 ```
-StrainID	weighted_percentile_FUKM	median_FUKM	sd_FUKM	subcontigs_detected	subcontigs_total	percent_detected	percent_abundance
-JEB00015	15.002476052670442	14.949939922104155	0.46622826476923757	38	38	100	13.524840656749035
-JEB00022	14.885728923252971	14.865410790723015	0.6712969280564985	52	52	100	13.41959227528449
-JEB00024	15.005580606237396	14.972944694458326	0.9742879632461824	42	42	100	13.527639434241228
-JEB00030	15.034270854543474	14.829354067500985	0.5823678254771962	28	28	100	13.553503900571984
-JEB00031	15.124317636874952	15.107007945963842	0.6698836185646367	30	30	100	13.634681726046297
-JEB00036	15.088684933746867	14.775182972247737	1.7746910771776707	48	48	100	13.602558586486888
-JEB00041	14.71064817309631	14.689071798986676	0.6518258370527644	26	26	100	13.261755712865087
-JEB00052	6.073637031925493	5.977622518629116	0.27601498880837394	50	50	100	5.4754277077549895
+StrainID	weighted_percentile_FUKM	median_FUKM	sd_FUKM	percent_unique	subcontigs_detected	subcontigs_total	percent_detected	percent_abundance
+JEB00015	15.002476052670442	14.949939922104155	0.4726593032507126	98.51158561041545	19	19	100	13.524840656749035
+JEB00022	14.885728923252971	14.865410790723015	0.6779766640013899	95.20427606765057	26	26	100	13.41959227528449
+JEB00024	15.005580606237396	14.972944694458326	0.9863913833816442	96.14317018025944	21	21	100	13.527639434241228
+JEB00030	15.034270854543474	14.829354067500985	0.5934615427913016	96.47958772126373	14	14	100	13.553503900571984
+JEB00031	15.124317636874952	15.107007945963842	0.6817408863191012	94.98138933243365	15	15	100	13.634681726046297
+JEB00036	15.088684933746867	14.775182972247737	1.7938774842590952	92.18666707689261	24	24	100	13.602558586486888
+JEB00041	14.71064817309631	14.689071798986676	0.665266959142419	98.23359740257649	13	13	100	13.261755712865087
+JEB00052	6.073637031925493	5.977622518629116	0.2788753241555509	96.52905701754386	25	25	100	5.4754277077549895
 ``` 
 We can also view a visualization of the results in testrun.pdf which summarizes the abundances. In this particular testing data, most strains are present at similar abundances with the exception of JEB00052 which is underrepresented. 
 
@@ -233,7 +241,7 @@ We can also view a visualization of the results in testrun.pdf which summarizes 
 # Credits:
 Paper: \<Link to paper to be added when published\>
 
-For any issues or questions contact kerim@heber.org
+Please do not hesitate to contact kerim@heber.org for any issues, feedback, or help :)
 
 <p>&nbsp;</p>
 

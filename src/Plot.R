@@ -33,7 +33,7 @@ Norm<-
     read_tsv(paste0(opt$indir,"/KmerContent.report"), col_types="ccccid")
   ) %>%
   mutate(Total_Mapped_Reads_In_Sample=mapped) %>%
-  select(StrainID, ContigID, Start_Stop, Unique_Kmers=Nunique, Length_Contig=Length, Bases, Coverage, Mapped_Reads=Reads, Mapped_Frags=Frags, Total_Mapped_Reads_In_Sample) %>%
+  select(StrainID, ContigID, Start_Stop, Unique_Kmers=Nunique, Length_Contig=Length, Percent_Unique, Bases, Coverage, Mapped_Reads=Reads, Mapped_Frags=Frags, Total_Mapped_Reads_In_Sample) %>%
   mutate(FUKM=Mapped_Frags/(Unique_Kmers/1e3)/(Total_Mapped_Reads_In_Sample/1e6)) %>%
   group_by(StrainID)%>%
   filter(Unique_Kmers>=quantile(Unique_Kmers,opt$subcontigfilter/100, na.rm=T))%>%
@@ -71,11 +71,18 @@ weighted.percentile <- function(values, weights) {
   return(values[percentile_index])
 }
 
+kmer_size <- read_tsv(paste0(opt$indir,"/","options.txt"), col_names=F) %>%
+  setNames(c("option","value")) %>%
+  filter(option=="kmersize") %>%
+  pull(value) %>%
+  as.numeric()
+
 abundance_summary <- Norm %>% group_by(StrainID) %>%
   summarise(
     weighted_percentile_FUKM = weighted.percentile(FUKM, Unique_Kmers),
     median_FUKM=median(FUKM, na.rm=T),
     sd_FUKM=sd(FUKM, na.rm=T),
+    percent_unique= sum(Unique_Kmers) / (sum(Length_Contig-kmer_size+1))*100,
     subcontigs_detected=length(FUKM[FUKM!=0]),
     subcontigs_total=n(),
     percent_detected=length(FUKM[FUKM!=0])/n() * 100

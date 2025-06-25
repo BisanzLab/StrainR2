@@ -44,7 +44,7 @@ jobs:
       - name: test run comp
         shell: bash -el {0}
         run: |
-          conda install -c bioconda -c conda-forge -y strainr2 bedtools
+          conda install -c bioconda -c conda-forge -y strainr2
           conda remove --force -y strainr2
           make -C src release
           export PATH="$(pwd)/src/:$PATH"
@@ -61,4 +61,24 @@ jobs:
             -r tests/StrainR2DB_testing -o tests/StrainR2_out_testing_bg -p testing_bg -t 1
           diff <(sort tests/StrainR2_out_testing_bg/testing_bg.abundances) <(sort tests/background/expected_output/testing_bg.abundances)
           diff <(sort tests/StrainR2_out_testing_bg/testing_bg_abundance_summary.tsv) <(sort tests/background/expected_output/testing_bg_abundance_summary.tsv)
+          
+
+  test_single_end_reads:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+      - name: test single end reads
+        shell: bash -el {0}
+        run: |
+          conda install -c bioconda -c conda-forge -y strainr2
+          conda remove --force -y strainr2
+          make -C src release
+          export PATH="$(pwd)/src/:$PATH"
+          PreProcessR -i tests/genomes/mixture -o tests/StrainR2DB_testing --singleend
+          diff <(sort tests/StrainR2DB_testing/KmerContent.report) <(sort tests/expected_output/KmerContent_comprehensive_se.report)
+          StrainR -1 tests/inputs/mock_reads_testing_R1.fastq.gz \
+            -r tests/StrainR2DB_testing -o tests/StrainR2_out_testing -p testing -t 1
+          diff <(sort tests/StrainR2_out_testing/testing.abundances) <(sort tests/expected_output/testing_comprehensive_se.abundances)
+          diff <(sort tests/StrainR2_out_testing/testing_abundance_summary.tsv) <(sort tests/expected_output/abundance_summary_comprehensive_se.tsv)
           

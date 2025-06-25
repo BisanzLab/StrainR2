@@ -1,0 +1,7 @@
+indir	tests/genomes/mixture
+outdir	tests/StrainR2DB_testing
+excludesize	10000
+subcontigsize	N50
+readsize	150
+kmersize	301
+singleend	FALSE

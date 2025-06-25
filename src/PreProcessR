@@ -9,6 +9,7 @@ readsize=150
 outdir='StrainR2DB'
 excludesize=10000
 memory_efficient=""
+singleend=false
 
 #parse options
 i=0
@@ -22,6 +23,7 @@ for argument in $options
       -r | --readsize) readsize="${arguments[i]}" ;;
       -s | --subcontigsize) subcontigsize="${arguments[i]}" ;;
       -e | --excludesize) excludesize="${arguments[i]}" ;;
+      -m | --singleend) singleend=true ;;
 #      -m | --memoryefficient) memory_efficient="-m" ;;
       -h | --help) 
             printf "USAGE: PreProcessR -i path/to/in [OPTIONS]\n\
@@ -32,7 +34,8 @@ PreProcessR counts the unique hashes in subcontigs for StrainR to normalize read
 \t\t-o/--outdir path/to/out\t\t: path to your output directory [Default = StrainR2DB]\n\
 \t\t-e/--excludesize number\t\t: exclude subcontig size (minimum subcontig size) [Default = 10000]\n\
 \t\t-s/--subcontigsize number\t: maximum subcontig size (overrides default use of calculated smallest N50)[Default = N50]\n\
-\t\t-r/--readsize number\t\t: Size of one end of a read. E.g.: for 150bp paired end reads readsize is 150. All reads must be paired. [Default = 150]\n\
+\t\t-r/--readsize number\t\t: Size of one end of a read. e.g.: for 150bp paired end reads readsize is 150. [Default = 150]\n\
+\t\t-m/--singleend\t\t\t: Flag that should be used if only single end reads will be provided to StrainR2. Disabled by default.\n\
 \t\t-h/--help\t\t\t: Display this message\n"
             exit
             ;;
@@ -43,30 +46,46 @@ if [ -z "$indir" ]; then
   echo "Error: Input directory needs to be specified with -i or --indir. Use 'PreprocessR --help' for more info."
   exit
 fi
-  
+if [ ! -d "$indir" ]; then
+  echo "Error: Input directory doesn't exist."
+  exit
+fi
 
 #preprocessr pipeline
 echo "Creating subcontigs"
-mkdir "$outdir"
-ksize=$(($readsize * 2 + 1))
+if ! mkdir "$outdir"; then
+  echo "Error: failed to create outdir. Exiting."
+  exit
+fi
+
+if [[ $singleend == true ]]; then
+  echo "WARNING: you have enabled single ended reads"
+  # makes kmer size odd if the read size isn't odd
+  ksize=$(($readsize / 2 * 2 + 1))
+else
+  ksize=$(($readsize * 2 + 1))
+fi
 
 if ! [ -z "$subcontigsize" ]; then
-  subcontigsize="-s $subcontigsize"
+  subcontigsize_opt="-s $subcontigsize"
 fi
 
 
-if ! subcontig -i "$indir" -o "$outdir" -e "$excludesize" "$subcontigsize"; then
+if ! subcontig -i "$indir" -o "$outdir" -e "$excludesize" "$subcontigsize_opt"; then
   echo "Subcontig generation failed"
   exit
 fi
 
+# number of subcontigs based on number of subcontig files written
 num_subconts=$(printf "$(ls -l "$outdir"/Subcontigs/ | wc -l)+$(ls -l "$outdir"/excludedSubcontigs/ | wc -l)\n" | bc)
 if ! hashcounter -s "$outdir"/Subcontigs/ -e "$outdir"/excludedSubcontigs/ -k "$ksize" -o "$outdir" -n "$num_subconts"; then
   echo "Hashing failed"
   exit
 fi
 
+# filter excluded subcontigs from KmerContent.report
 sed -i -n -E '/;EXCLUDED_.+\tEXCLUDED_/!p' "$outdir"/KmerContent.report
+
 echo "Generating BBIndex"
 mkdir "$outdir"/BBindex
 ls "$outdir"/Subcontigs/ | sed -n '/\.subcontig$/p' | sed 's|^|'"$outdir"'/Subcontigs/|' | \
@@ -74,6 +93,26 @@ ls "$outdir"/Subcontigs/ | sed -n '/\.subcontig$/p' | sed 's|^|'"$outdir"'/Subco
 ls "$outdir"/excludedSubcontigs/ | sed -n '/\.subcontig$/p' | sed 's|^|'"$outdir"'/excludedSubcontigs/|' | \
   xargs cat >> "$outdir"/BBindex/BBIndex.fasta
 bbmap.sh ref="$outdir"/BBindex/BBIndex.fasta path="$outdir"/BBindex deterministic=t averagepairdist=200
+
+# writing options that were used in PreProcessR for future reference when running StrainR
+touch "$outdir"/options.txt
+printf "indir\t%s\noutdir\t%s\nexcludesize\t%s\n" \
+  $indir $outdir $excludesize >> "$outdir"/options.txt
+
+if [ -z "$subcontigsize" ]; then
+  printf "subcontigsize\t%s\n" "N50" >> "$outdir"/options.txt
+else
+  printf "subcontigsize\t%s\n" "$subcontigsize" >> "$outdir"/options.txt
+fi
+
+printf "readsize\t%s\nkmersize\t%s\n" \
+  $readsize $ksize >> "$outdir"/options.txt
+
+if [[ $singleend == true ]]; then
+  printf "singleend\tTRUE\n" >> "$outdir"/options.txt
+else
+  printf "singleend\tFALSE\n" >> "$outdir"/options.txt
+fi
 
 echo "PreProcessR complete"
 echo "Total Run Time: $((($SECONDS - $START_TIME)/60)) min $((($SECONDS - $START_TIME)%60)) sec"  
