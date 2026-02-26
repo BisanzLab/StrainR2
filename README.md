@@ -225,6 +225,8 @@ We can also view a visualization of the results in testrun.pdf which summarizes 
 
 ![image](https://github.com/user-attachments/assets/972d1c77-ee42-4626-8316-bc8b8cdd7b7e)
 
+# Credits:
+[StrainR2 accurately deconvolutes strain-level abundances in synthetic microbial communities](https://academic.oup.com/bioinformatics/article/41/8/btaf440/8223223). Kerim Heber, Schuchang Tian, Daniela Betancurt-Anzola, Jordan Bisanz. Bioinformatics (2025)
 
 # Dependencies
 
@@ -237,11 +239,6 @@ We can also view a visualization of the results in testrun.pdf which summarizes 
  * R optparse
  * R tidyverse
  * zlib
-
-# Credits:
-Paper: \<Link to paper to be added when published\>
-
-Please do not hesitate to contact kerim@heber.org for any issues, feedback, or help :)
 
 <p>&nbsp;</p>
 
